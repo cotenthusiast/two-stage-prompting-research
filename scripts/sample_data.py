@@ -1,4 +1,4 @@
-# scripts.sample_data
+# scripts/sample_data
 
 from __future__ import annotations
 import pandas as pd

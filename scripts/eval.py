@@ -1,4 +1,4 @@
-# scripts.eval.py
+# scripts/eval.py
 
 from pathlib import Path
 import matplotlib.pyplot as plt

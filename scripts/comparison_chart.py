@@ -1,0 +1,66 @@
+# scripts/comparison_chart.py
+import pandas as pd
+import matplotlib.pyplot as plt
+import numpy as np
+
+BASELINE_PATH = "results/baseline_results.csv"
+TWO_STAGE_PATH = "results/two_prompt_results.csv"
+
+def load_and_compute(path: str) -> pd.Series:
+    """
+    Loads a results CSV and computes per-subject accuracy.
+    Args:
+        path: path to the results CSV
+    Returns:
+        pd.Series with subject as index and accuracy as values
+    """
+    mapping = {0: "A", 1: "B", 2: "C", 3: "D"}
+    df = pd.read_csv(path)
+    df["actual"] = df["actual"].map(mapping)
+    return df.groupby("subject").apply(
+        lambda g: (g["predicted"] == g["actual"]).sum() / len(g)
+    )
+
+def plot_comparison(baseline: pd.Series, two_stage: pd.Series) -> None:
+    """
+    Plots a back-to-back horizontal bar chart comparing baseline and two-stage accuracy per subject.
+    Args:
+        baseline: per-subject accuracy for the baseline
+        two_stage: per-subject accuracy for the two-stage approach
+    """
+    subjects = baseline.index.tolist()
+    baseline_vals = baseline.values
+    two_stage_vals = two_stage.values
+
+    y = np.arange(len(subjects))
+
+    fig, ax = plt.subplots(figsize=(10, 6))
+    ax.barh(y, [-v for v in baseline_vals], label="Baseline", color="steelblue")
+    ax.barh(y, two_stage_vals, label="Two-stage", color="darkorange")
+
+    ax.set_yticks(y)
+    ax.set_yticklabels(subjects)
+    ax.axvline(0, color="black", linewidth=0.8)
+    ax.set_xticks(ax.get_xticks())
+    ax.set_xticklabels([f"{abs(x):.0%}" for x in ax.get_xticks()])
+    ax.set_xlabel("Accuracy")
+    ax.set_title("Baseline vs Two-stage accuracy by subject")
+    ax.legend()
+
+    plt.tight_layout()
+    plt.savefig("results/comparison.png")
+    print("Saved to results/comparison.png")
+
+def main():
+    baseline = load_and_compute(BASELINE_PATH)
+    two_stage = load_and_compute(TWO_STAGE_PATH)
+
+    # Align on shared subjects
+    subjects = baseline.index.intersection(two_stage.index)
+    baseline = baseline.loc[subjects]
+    two_stage = two_stage.loc[subjects]
+
+    plot_comparison(baseline, two_stage)
+
+if __name__ == "__main__":
+    main()

@@ -36,14 +36,10 @@ def extract_answer(response: str) -> str:
         The letter found or None if nothing found
     """
     letters = ["A", "B", "C", "D"]
-    # 1. Look for patterns like "Answer: A" or "Option A"
     match = re.search(r'(?i)Answer\s*:\s*([ABCD])', response)
     if not match:
-        # 2. If that fails, look for the letter by itself, 
-        # surrounded by spaces or punctuation (e.g., "The answer is A.")
         match = re.search(r'\b([ABCD])\b', response)
     if match:
-        # Return the first captured group (the letter) in uppercase
         return match.group(1).upper()
     return None
 

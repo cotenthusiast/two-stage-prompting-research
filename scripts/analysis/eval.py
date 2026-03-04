@@ -1,10 +1,15 @@
-# scripts/eval.py
+# scripts/analysis/eval.py
+# Evaluates a single experiment's results: overall accuracy, failure rate,
+# and per-subject accuracy bar chart.
 
 from pathlib import Path
 import matplotlib.pyplot as plt
 import pandas as pd
 import argparse
 import numpy as np
+import os
+
+PLOTS_DIR = "results/plots"
 
 parser = argparse.ArgumentParser(
     prog = "evaluation script",
@@ -50,7 +55,10 @@ def plot_results(per_subject_acc: pd.Series, overall_accuracy: float, stem: str)
     chart.axhline(y=overall_accuracy, color='red', linestyle='--', label=f"Overall: {overall_accuracy:.2%}")
     chart.legend()
     plt.tight_layout()
-    plt.savefig(f"results/{stem}_accuracy.png")
+
+    os.makedirs(PLOTS_DIR, exist_ok=True)
+    plt.savefig(f"{PLOTS_DIR}/{stem}_accuracy.png")
+    print(f"Saved to {PLOTS_DIR}/{stem}_accuracy.png")
 
 def main():
     """

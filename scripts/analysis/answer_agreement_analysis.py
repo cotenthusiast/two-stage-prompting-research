@@ -1,10 +1,20 @@
+# scripts/analysis/answer_agreement_analysis.py
+# Compares baseline and two-stage results on a per-question basis.
+# Produces a pie chart (overall agreement) and a stacked bar chart (per-subject).
+
 import pandas as pd
 import matplotlib.pyplot as plt
 import numpy as np
 
-questions = pd.read_csv("data/questions.csv")
-baseline = pd.read_csv("results/baseline_results.csv")
-two_prompt = pd.read_csv("results/two_stage_results.csv")
+QUESTIONS_PATH = "data/questions.csv"
+BASELINE_PATH = "results/baseline/baseline_results.csv"
+TWO_STAGE_PATH = "results/two_stage/two_stage_results.csv"
+PIE_PLOT_PATH = "results/plots/agreement_overall.png"
+BAR_PLOT_PATH = "results/plots/agreement_per_subject.png"
+
+questions = pd.read_csv(QUESTIONS_PATH)
+baseline = pd.read_csv(BASELINE_PATH)
+two_prompt = pd.read_csv(TWO_STAGE_PATH)
 
 mapping = {0: "A", 1: "B", 2: "C", 3: "D"}
 questions["answer"] = questions["answer"].map(mapping)
@@ -45,8 +55,8 @@ ax.pie(
 )
 ax.set_title("Answer Agreement: Baseline vs Two-Stage", fontsize=13)
 plt.tight_layout()
-plt.savefig("results/agreement_overall.png", dpi=150)
-print("\nSaved: results/agreement_overall.png")
+plt.savefig(PIE_PLOT_PATH, dpi=150)
+print(f"\nSaved: {PIE_PLOT_PATH}")
 
 # Per-subject stacked bar chart
 baseline["category"] = "Both Wrong"
@@ -82,5 +92,5 @@ ax.set_xlabel("Number of Questions")
 ax.set_title("Per-Subject Answer Agreement: Baseline vs Two-Stage")
 ax.legend(loc="lower right", fontsize=9)
 plt.tight_layout()
-plt.savefig("results/agreement_per_subject.png", dpi=150)
-print("Saved: results/agreement_per_subject.png")
+plt.savefig(BAR_PLOT_PATH, dpi=150)
+print(f"Saved: {BAR_PLOT_PATH}")

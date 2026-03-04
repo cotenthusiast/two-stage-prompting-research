@@ -1,4 +1,8 @@
-# scripts/two_prompt.py
+# scripts/experiments/two_prompt.py
+# Runs the two-stage prompting experiment using Gemini.
+# Stage 1: Free-text reasoning without answer choices.
+# Stage 2: Match reasoning to MCQ options.
+
 import re
 import os
 import pandas as pd
@@ -69,7 +73,7 @@ def call_gemini(client: genai.Client, prompt: str) -> str:
     """
     return client.models.generate_content(model="gemini-2.5-flash", contents=prompt).text
 
-def main(client: genai.Client, questions: pd.DataFrame, path: str = "results/two_prompt_results.csv") -> None:
+def main(client: genai.Client, questions: pd.DataFrame, path: str = "results/two_stage/two_stage_results.csv") -> None:
     """
     Runs the two-stage prompting experiment. For each question, calls Gemini
     twice: once for free-text reasoning, once for MCQ matching. Saves results
@@ -77,7 +81,7 @@ def main(client: genai.Client, questions: pd.DataFrame, path: str = "results/two
     Args:
         client: the defined Gemini client
         questions: pandas dataframe containing the MMLU questions
-        path: path to save the results (default is "results/two_stage_results.csv")
+        path: path to save the results (default is "results/two_stage/two_stage_results.csv")
     """
     results = []
     api_call_count = 0

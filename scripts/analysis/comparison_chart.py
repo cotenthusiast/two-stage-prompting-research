@@ -1,10 +1,14 @@
-# scripts/comparison_chart.py
+# scripts/analysis/comparison_chart.py
+# Generates a back-to-back horizontal bar chart comparing baseline
+# and two-stage accuracy per subject.
+
 import pandas as pd
 import matplotlib.pyplot as plt
 import numpy as np
 
-BASELINE_PATH = "results/baseline_results.csv"
-TWO_STAGE_PATH = "results/two_stage_results.csv"
+BASELINE_PATH = "results/baseline/baseline_results.csv"
+TWO_STAGE_PATH = "results/two_stage/two_stage_results.csv"
+PLOT_PATH = "results/plots/comparison.png"
 
 
 def clean_subject_name(name: str) -> str:
@@ -64,8 +68,8 @@ def plot_comparison(baseline: pd.Series, two_stage: pd.Series) -> None:
     ax.legend()
 
     plt.tight_layout()
-    plt.savefig("results/comparison.png", dpi=150)
-    print("Saved to results/comparison.png")
+    plt.savefig(PLOT_PATH, dpi=150)
+    print(f"Saved to {PLOT_PATH}")
 
 
 def main():

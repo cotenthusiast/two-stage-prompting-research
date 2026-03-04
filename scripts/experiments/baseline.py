@@ -1,4 +1,6 @@
-# scripts/baseline.py
+# scripts/experiments/baseline.py
+# Runs the standard MCQ baseline experiment using Gemini.
+
 import re
 import os
 import pandas as pd
@@ -54,7 +56,7 @@ def call_gemini(client: genai.Client, prompt: str) -> str:
     """
     return client.models.generate_content(model="gemini-2.5-flash", contents=prompt).text
 
-def main(client: genai.Client, questions: pd.DataFrame, path: str = "results/baseline_results.csv") -> None:
+def main(client: genai.Client, questions: pd.DataFrame, path: str = "results/baseline/baseline_results.csv") -> None:
     """
     Main method that formats the questions and choices, passes the prompt
     to Gemini, extracts the token from the answer and stores the original
@@ -62,7 +64,7 @@ def main(client: genai.Client, questions: pd.DataFrame, path: str = "results/bas
     Args:
         client: The defined Gemini client
         questions: pandas dataframe containing the MMLU questions
-        path: path to save the results (default is "results/baseline_results.csv")
+        path: path to save the results (default is "results/baseline/baseline_results.csv")
     """
     results = []
     api_call_count = 0

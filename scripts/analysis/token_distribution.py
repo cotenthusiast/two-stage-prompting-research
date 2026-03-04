@@ -1,10 +1,19 @@
+# scripts/analysis/token_distribution.py
+# Compares the distribution of answer tokens (A/B/C/D) across the ground truth,
+# baseline predictions, and two-stage predictions.
+
 import pandas as pd
 import matplotlib.pyplot as plt
 import numpy as np
 
-questions = pd.read_csv("data/questions.csv")
-baseline = pd.read_csv("results/baseline_results.csv")
-two_prompt = pd.read_csv("results/two_stage_results.csv")
+QUESTIONS_PATH = "data/questions.csv"
+BASELINE_PATH = "results/baseline/baseline_results.csv"
+TWO_STAGE_PATH = "results/two_stage/two_stage_results.csv"
+PLOT_PATH = "results/plots/token_distribution.png"
+
+questions = pd.read_csv(QUESTIONS_PATH)
+baseline = pd.read_csv(BASELINE_PATH)
+two_prompt = pd.read_csv(TWO_STAGE_PATH)
 
 mapping = {0: "A", 1: "B", 2: "C", 3: "D"}
 questions["answer"] = questions["answer"].map(mapping)
@@ -38,4 +47,5 @@ ax.set_xticklabels(tokens)
 ax.legend()
 
 plt.tight_layout()
-plt.savefig("results/token_distribution.png", dpi=150)
+plt.savefig(PLOT_PATH, dpi=150)
+print(f"Saved to {PLOT_PATH}")

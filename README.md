@@ -1,4 +1,4 @@
-<img width="2879" height="1799" alt="image" src="https://github.com/user-attachments/assets/df0c29b7-9b79-4d85-8ad5-bed20170d935" /># Two-Stage Prompting for MCQ Bias Mitigation
+# Two-Stage Prompting for MCQ Bias Mitigation
 
 A pilot experiment testing whether a two-stage prompting approach can reduce selection bias in LLM multiple-choice question evaluation, inspired by the [PriDe paper (ICLR 2024)](https://arxiv.org/abs/2401.12485).
 

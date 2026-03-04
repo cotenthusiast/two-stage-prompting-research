@@ -4,7 +4,19 @@ import matplotlib.pyplot as plt
 import numpy as np
 
 BASELINE_PATH = "results/baseline_results.csv"
-TWO_STAGE_PATH = "results/two_prompt_results.csv"
+TWO_STAGE_PATH = "results/two_stage_results.csv"
+
+
+def clean_subject_name(name: str) -> str:
+    """
+    Converts underscore-separated subject names to title case.
+    Args:
+        name: raw subject string (e.g. "high_school_physics")
+    Returns:
+        Cleaned string (e.g. "High School Physics")
+    """
+    return name.replace("_", " ").title()
+
 
 def load_and_compute(path: str) -> pd.Series:
     """
@@ -21,6 +33,7 @@ def load_and_compute(path: str) -> pd.Series:
         lambda g: (g["predicted"] == g["actual"]).sum() / len(g)
     )
 
+
 def plot_comparison(baseline: pd.Series, two_stage: pd.Series) -> None:
     """
     Plots a back-to-back horizontal bar chart comparing baseline and two-stage accuracy per subject.
@@ -28,7 +41,7 @@ def plot_comparison(baseline: pd.Series, two_stage: pd.Series) -> None:
         baseline: per-subject accuracy for the baseline
         two_stage: per-subject accuracy for the two-stage approach
     """
-    subjects = baseline.index.tolist()
+    subjects = [clean_subject_name(s) for s in baseline.index.tolist()]
     baseline_vals = baseline.values
     two_stage_vals = two_stage.values
 
@@ -41,15 +54,19 @@ def plot_comparison(baseline: pd.Series, two_stage: pd.Series) -> None:
     ax.set_yticks(y)
     ax.set_yticklabels(subjects)
     ax.axvline(0, color="black", linewidth=0.8)
-    ax.set_xticks(ax.get_xticks())
-    ax.set_xticklabels([f"{abs(x):.0%}" for x in ax.get_xticks()])
+
+    ax.set_xlim(-1.0, 1.0)
+    ax.set_xticks([-1.0, -0.75, -0.5, -0.25, 0, 0.25, 0.5, 0.75, 1.0])
+    ax.set_xticklabels(["100%", "75%", "50%", "25%", "0%", "25%", "50%", "75%", "100%"])
+
     ax.set_xlabel("Accuracy")
-    ax.set_title("Baseline vs Two-stage accuracy by subject")
+    ax.set_title("Baseline vs Two-Stage Accuracy by Subject")
     ax.legend()
 
     plt.tight_layout()
-    plt.savefig("results/comparison.png")
+    plt.savefig("results/comparison.png", dpi=150)
     print("Saved to results/comparison.png")
+
 
 def main():
     baseline = load_and_compute(BASELINE_PATH)
@@ -61,6 +78,7 @@ def main():
     two_stage = two_stage.loc[subjects]
 
     plot_comparison(baseline, two_stage)
+
 
 if __name__ == "__main__":
     main()

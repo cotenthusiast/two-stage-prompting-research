@@ -2,57 +2,53 @@
 # Evaluates a single experiment's results: overall accuracy, failure rate,
 # and per-subject accuracy bar chart.
 
-from pathlib import Path
-import matplotlib.pyplot as plt
-import pandas as pd
+import os
+import sys
 import argparse
 import numpy as np
-import os
+import pandas as pd
+import matplotlib.pyplot as plt
+from pathlib import Path
 
-PLOTS_DIR = "results/plots"
+sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
+from utils.constants import ANSWER_MAPPING, PLOTS_DIR
 
-parser = argparse.ArgumentParser(
-    prog = "evaluation script",
-    description = "script that reads in a csv of results and saves a plot analysing the results",
-    epilog= "thank you for using the script"
-)
-
-parser.add_argument("filepath")
-args = parser.parse_args()
-
-stem = Path(args.filepath).stem.replace("_results", "")
 
 def compute_metrics(df: pd.DataFrame) -> tuple[float, float, pd.Series]:
     """
-    Computes overall accuracy, failure rate and accuracy per subject from a results df
+    Computes overall accuracy, failure rate, and per-subject accuracy.
+
     Args:
-        df: the dataframe to be analysed
+        df: Results DataFrame with actual, predicted, and subject columns.
+
     Returns:
-        A tuple containign the overall accuracy, failure rate and a pd series with the accuracy per subject
+        Tuple of (overall_accuracy, failure_rate, per_subject_accuracy).
     """
-    mapping = {0: "A", 1: "B", 2: "C", 3: "D"}
-    df["actual"] = df["actual"].map(mapping)
+    df["actual"] = df["actual"].map(ANSWER_MAPPING)
     num_correct = np.sum(df["predicted"] == df["actual"])
-    overall_accuracy = num_correct/df["actual"].count()
+    overall_accuracy = num_correct / df["actual"].count()
     per_subject_acc = df.groupby("subject").apply(
         lambda g: (g["predicted"] == g["actual"]).sum() / len(g)
-        )
+    )
     failure_rate = df["predicted"].isna().sum() / len(df)
     return overall_accuracy, failure_rate, per_subject_acc
 
+
 def plot_results(per_subject_acc: pd.Series, overall_accuracy: float, stem: str) -> None:
     """
-    plots a bar chart of the accuracy per subject and plots a horizontal line at the overall accuracy
+    Plots a bar chart of per-subject accuracy with an overall accuracy line.
+
     Args:
-        per_subject_acc: pd.Series with the accuracy per subject and the subject as index
-        overall_accuracy: the overall accuracy of the results
-        stem: used when saving the file
+        per_subject_acc: Series with subject as index and accuracy as values.
+        overall_accuracy: Overall accuracy to draw as a horizontal reference line.
+        stem: Used as the filename stem when saving the plot.
     """
     chart = per_subject_acc.plot(kind="bar")
     chart.set_xlabel("Subject")
     chart.set_ylabel("Accuracy")
     chart.set_title(f"{stem} accuracy by subject")
-    chart.axhline(y=overall_accuracy, color='red', linestyle='--', label=f"Overall: {overall_accuracy:.2%}")
+    chart.axhline(y=overall_accuracy, color='red', linestyle='--',
+                  label=f"Overall: {overall_accuracy:.2%}")
     chart.legend()
     plt.tight_layout()
 
@@ -60,15 +56,26 @@ def plot_results(per_subject_acc: pd.Series, overall_accuracy: float, stem: str)
     plt.savefig(f"{PLOTS_DIR}/{stem}_accuracy.png")
     print(f"Saved to {PLOTS_DIR}/{stem}_accuracy.png")
 
-def main():
+
+def main() -> None:
     """
-    Imports csv as pd.DataFrame using argparse and calls compute_metrics() and plot_results()
+    Reads a results CSV via argparse and calls compute_metrics() and plot_results().
     """
+    parser = argparse.ArgumentParser(
+        prog="evaluation script",
+        description="Reads a results CSV and saves a per-subject accuracy plot.",
+        epilog="Example: python eval.py results/baseline/baseline_results.csv"
+    )
+    parser.add_argument("filepath", help="Path to the results CSV file.")
+    args = parser.parse_args()
+
+    stem = Path(args.filepath).stem.replace("_results", "")
     df = pd.read_csv(args.filepath)
     accuracy, failure_rate, per_subject_acc = compute_metrics(df)
     plot_results(per_subject_acc, accuracy, stem)
     print(f"Overall accuracy: {accuracy:.2%}")
     print(f"Failure rate: {failure_rate:.2%}")
+
 
 if __name__ == "__main__":
     main()

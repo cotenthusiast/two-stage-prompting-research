@@ -2,50 +2,87 @@
 # Compares the distribution of answer tokens (A/B/C/D) across the ground truth,
 # baseline predictions, and two-stage predictions.
 
+import os
+import sys
 import pandas as pd
 import matplotlib.pyplot as plt
 import numpy as np
 
-QUESTIONS_PATH = "data/questions.csv"
-BASELINE_PATH = "results/baseline/baseline_results.csv"
-TWO_STAGE_PATH = "results/two_stage/two_stage_results.csv"
-PLOT_PATH = "results/plots/token_distribution.png"
+sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
+from utils.constants import (
+    ANSWER_MAPPING,
+    QUESTIONS_PATH,
+    BASELINE_RESULTS_PATH,
+    TWO_STAGE_RESULTS_PATH,
+    TOKEN_DIST_PLOT_PATH,
+)
 
-questions = pd.read_csv(QUESTIONS_PATH)
-baseline = pd.read_csv(BASELINE_PATH)
-two_prompt = pd.read_csv(TWO_STAGE_PATH)
 
-mapping = {0: "A", 1: "B", 2: "C", 3: "D"}
-questions["answer"] = questions["answer"].map(mapping)
-baseline["actual"] = baseline["actual"].map(mapping)
-two_prompt["actual"] = two_prompt["actual"].map(mapping)
+def load_data() -> tuple[pd.DataFrame, pd.DataFrame, pd.DataFrame]:
+    """
+    Loads and preprocesses the questions, baseline, and two-stage results CSVs.
 
-questions_count = questions["answer"].value_counts()
-baseline_count = baseline["predicted"].value_counts()
-two_prompt_count = two_prompt["predicted"].value_counts()
+    Returns:
+        Tuple of (questions, baseline, two_prompt) DataFrames with answer
+        columns mapped to letters.
+    """
+    questions = pd.read_csv(QUESTIONS_PATH)
+    baseline = pd.read_csv(BASELINE_RESULTS_PATH)
+    two_prompt = pd.read_csv(TWO_STAGE_RESULTS_PATH)
 
-print(questions_count)
-print(baseline_count)
-print(two_prompt_count)
+    questions["answer"] = questions["answer"].map(ANSWER_MAPPING)
+    baseline["actual"] = baseline["actual"].map(ANSWER_MAPPING)
+    two_prompt["actual"] = two_prompt["actual"].map(ANSWER_MAPPING)
 
-tokens = ["A", "B", "C", "D"]
-x = np.arange(len(tokens))
-width = 0.25
+    return questions, baseline, two_prompt
 
-fig, ax = plt.subplots(figsize=(8, 5))
-ax.bar(x - width, questions_count.reindex(tokens).values, width, label="Actual")
-ax.bar(x, baseline_count.reindex(tokens).values, width, label="Baseline")
-ax.bar(x + width, two_prompt_count.reindex(tokens).values, width, label="Two-Stage")
 
-ax.axhline(25, color="grey", linestyle="--", linewidth=0.8, label="Uniform (25%)")
+def plot_token_distribution(questions: pd.DataFrame, baseline: pd.DataFrame,
+                             two_prompt: pd.DataFrame) -> None:
+    """
+    Plots a grouped bar chart comparing token distributions across actual answers,
+    baseline predictions, and two-stage predictions.
 
-ax.set_xlabel("Answer Token")
-ax.set_ylabel("Count")
-ax.set_title("Token Distribution: Actual vs Baseline vs Two-Stage")
-ax.set_xticks(x)
-ax.set_xticklabels(tokens)
-ax.legend()
+    Args:
+        questions: Questions DataFrame with mapped answer column.
+        baseline: Baseline results DataFrame with mapped actual column.
+        two_prompt: Two-stage results DataFrame with mapped actual column.
+    """
+    tokens = ["A", "B", "C", "D"]
+    x = np.arange(len(tokens))
+    width = 0.25
 
-plt.tight_layout()
-plt.savefig(PLOT_PATH, dpi=150)
-print(f"Saved to {PLOT_PATH}")
+    questions_count = questions["answer"].value_counts()
+    baseline_count = baseline["predicted"].value_counts()
+    two_prompt_count = two_prompt["predicted"].value_counts()
+
+    print(questions_count)
+    print(baseline_count)
+    print(two_prompt_count)
+
+    fig, ax = plt.subplots(figsize=(8, 5))
+    ax.bar(x - width, questions_count.reindex(tokens).values, width, label="Actual")
+    ax.bar(x, baseline_count.reindex(tokens).values, width, label="Baseline")
+    ax.bar(x + width, two_prompt_count.reindex(tokens).values, width, label="Two-Stage")
+
+    ax.axhline(25, color="grey", linestyle="--", linewidth=0.8, label="Uniform (25%)")
+    ax.set_xlabel("Answer Token")
+    ax.set_ylabel("Count")
+    ax.set_title("Token Distribution: Actual vs Baseline vs Two-Stage")
+    ax.set_xticks(x)
+    ax.set_xticklabels(tokens)
+    ax.legend()
+
+    plt.tight_layout()
+    os.makedirs(os.path.dirname(TOKEN_DIST_PLOT_PATH), exist_ok=True)
+    plt.savefig(TOKEN_DIST_PLOT_PATH, dpi=150)
+    print(f"Saved to {TOKEN_DIST_PLOT_PATH}")
+
+
+def main() -> None:
+    questions, baseline, two_prompt = load_data()
+    plot_token_distribution(questions, baseline, two_prompt)
+
+
+if __name__ == "__main__":
+    main()

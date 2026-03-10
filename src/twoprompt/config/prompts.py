@@ -1,0 +1,35 @@
+PROMPTS = {
+    "direct_mcq": """Answer the following multiple-choice question.
+
+Question: {question}
+
+Options:
+A. {option_a}
+B. {option_b}
+C. {option_c}
+D. {option_d}
+
+Respond with only the letter.""",
+
+    "free_text": """Answer the following question based on your knowledge.
+
+Question: {question}
+
+Respond with a short direct answer only.""",
+
+    "option_matching": """You are given a question, a reference answer, and four options.
+
+Question: {question}
+
+Reference answer: {free_text}
+
+Options:
+A. {option_a}
+B. {option_b}
+C. {option_c}
+D. {option_d}
+
+Select the option that best matches the reference answer in the context of the question.
+If the reference answer is imperfect or incomplete, choose the closest option.
+Respond with only the letter.""",
+}

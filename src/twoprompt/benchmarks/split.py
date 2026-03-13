@@ -234,7 +234,6 @@ def build_split_metadata(
     excluded_id_count = len(exclude_ids)
     split_metadata = {
         "split_name": split_name,
-        "split_ids": split_ids,
         "subjects": subjects,
         "per_subject": per_subject,
         "seed": seed,
@@ -258,7 +257,8 @@ def build_all_splits(
     normalized canonical question DataFrame. It builds the robustness split
     first, then builds the review split while excluding IDs already assigned
     to robustness. Each split is validated against the dataset, checked for
-    cross-split overlap, and converted into a metadata artifact.
+    cross-split overlap, and assembled into a split artifact containing the
+    selected question IDs and the corresponding metadata.
 
     Args:
         df: Normalized question DataFrame containing at least ``question_id``
@@ -267,7 +267,13 @@ def build_all_splits(
         review_seed: Random seed used to generate the review split.
 
     Returns:
-        A dictionary mapping split names to their metadata artifacts.
+        A dictionary mapping split names to split artifacts. Each split
+        artifact has the form::
+
+            {
+                "ids": list[str],
+                "metadata": dict[str, Any],
+            }
 
     Raises:
         SplitSizeMismatchError: If a generated split does not match its
@@ -304,6 +310,12 @@ def build_all_splits(
     )
     exclude_ids = exclude_ids.union(robustness_split_ids)
 
+    return_dict = {}
+    return_dict[ROBUSTNESS_TRACK_NAME] = {
+        "ids" : robustness_split_ids,
+        "metadata" : robustness_metadata
+    }
+
     review_exclude_ids = exclude_ids.copy()
     review_split_ids = build_review_split(
         df,
@@ -333,7 +345,10 @@ def build_all_splits(
         }
     )
 
-    return {
-        ROBUSTNESS_TRACK_NAME: robustness_metadata,
-        REVIEW_TRACK_NAME: review_metadata,
+    return_dict[REVIEW_TRACK_NAME] = {
+        "ids" : review_split_ids,
+        "metadata" : review_metadata
     }
+
+
+    return return_dict

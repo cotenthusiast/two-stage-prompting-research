@@ -17,10 +17,6 @@ def test_build_direct_mcq_prompt_includes_question_options_and_letter_instructio
 
 def test_build_free_text_prompt_includes_question_and_excludes_options():
     question = "Which number has one factor?"
-    option_a = "one"
-    option_b = "two"
-    option_c = "three"
-    option_d = "four"
 
     actual = build_free_text_prompt(question)
 

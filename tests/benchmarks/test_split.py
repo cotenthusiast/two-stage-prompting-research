@@ -149,12 +149,6 @@ def test_build_split_metadata_returns_expected_fields(
 
     expected_metadata = {
         "split_name": "robustness",
-        "split_ids": [
-            "computer_security__01",
-            "computer_security__02",
-            "high_school_physics__01",
-            "anatomy__01",
-        ],
         "subjects": [
             "computer_security",
             "high_school_physics",
@@ -186,9 +180,17 @@ def test_build_all_splits_returns_both_split_artifacts(
     robustness_artifact = artifacts["robustness"]
     review_artifact = artifacts["review"]
 
-    required_keys = {
+    assert set(robustness_artifact.keys()) == {"ids", "metadata"}
+    assert set(review_artifact.keys()) == {"ids", "metadata"}
+
+    robustness_ids = robustness_artifact["ids"]
+    review_ids = review_artifact["ids"]
+
+    robustness_metadata = robustness_artifact["metadata"]
+    review_metadata = review_artifact["metadata"]
+
+    required_metadata_keys = {
         "split_name",
-        "split_ids",
         "subjects",
         "per_subject",
         "seed",
@@ -199,17 +201,14 @@ def test_build_all_splits_returns_both_split_artifacts(
         "excluded_id_count",
     }
 
-    assert required_keys <= set(robustness_artifact.keys())
-    assert required_keys <= set(review_artifact.keys())
-
-    robustness_ids = robustness_artifact["split_ids"]
-    review_ids = review_artifact["split_ids"]
+    assert required_metadata_keys <= set(robustness_metadata.keys())
+    assert required_metadata_keys <= set(review_metadata.keys())
 
     robustness_expected_size = (
-        len(robustness_artifact["subjects"]) * robustness_artifact["per_subject"]
+        len(robustness_metadata["subjects"]) * robustness_metadata["per_subject"]
     )
     review_expected_size = (
-        len(review_artifact["subjects"]) * review_artifact["per_subject"]
+        len(review_metadata["subjects"]) * review_metadata["per_subject"]
     )
 
     split.validate_split_ids(
@@ -230,11 +229,11 @@ def test_build_all_splits_returns_both_split_artifacts(
         }
     )
 
-    assert robustness_artifact["split_name"] == "robustness"
-    assert review_artifact["split_name"] == "review"
+    assert robustness_metadata["split_name"] == "robustness"
+    assert review_metadata["split_name"] == "review"
 
-    assert robustness_artifact["actual_size"] == len(robustness_ids)
-    assert review_artifact["actual_size"] == len(review_ids)
+    assert robustness_metadata["actual_size"] == len(robustness_ids)
+    assert review_metadata["actual_size"] == len(review_ids)
 
 
 def test_build_robustness_split_excludes_excluded_ids(

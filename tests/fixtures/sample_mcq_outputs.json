@@ -1,0 +1,71 @@
+{
+  "gold_choice": "B",
+  "options": {
+    "A": "Acute asthma exacerbation",
+    "B": "Type 2 diabetes mellitus",
+    "C": "Essential hypertension",
+    "D": "Migraine without aura"
+  },
+  "cases": [
+    {
+      "name": "clean_b",
+      "raw_text": "B",
+      "expected_status": "parse_ok",
+      "expected_choice": "B"
+    },
+    {
+      "name": "answer_c",
+      "raw_text": "Answer: C",
+      "expected_status": "parse_ok",
+      "expected_choice": "C"
+    },
+    {
+      "name": "reasoning_final_a",
+      "raw_text": "The symptoms fit option A best. Final answer: A",
+      "expected_status": "parse_ok",
+      "expected_choice": "A"
+    },
+    {
+      "name": "empty_string",
+      "raw_text": "",
+      "expected_status": "parse_missing",
+      "expected_choice": null
+    },
+    {
+      "name": "nonsense_text",
+      "raw_text": "I am not sure what the answer is here.",
+      "expected_status": "parse_invalid",
+      "expected_choice": null
+    },
+    {
+      "name": "conflicting_letters",
+      "raw_text": "A or C",
+      "expected_status": "parse_ambiguous",
+      "expected_choice": null
+    },
+    {
+      "name": "option_text_instead_of_letter",
+      "raw_text": "Type 2 diabetes mellitus",
+      "expected_status": "parse_ok",
+      "expected_choice": "B"
+    },
+    {
+      "name": "lowercase_with_spaces",
+      "raw_text": "   b   ",
+      "expected_status": "parse_ok",
+      "expected_choice": "B"
+    },
+    {
+      "name": "punctuation_around_letter",
+      "raw_text": "(D).",
+      "expected_status": "parse_ok",
+      "expected_choice": "D"
+    },
+    {
+      "name": "ambiguous_text_match",
+      "raw_text": "This looks like essential hypertension or migraine without aura.",
+      "expected_status": "parse_ambiguous",
+      "expected_choice": null
+    }
+  ]
+}

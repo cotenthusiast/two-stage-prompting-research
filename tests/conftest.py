@@ -314,3 +314,49 @@ def failed_response(valid_metadata: RequestMetadata) -> ModelResponse:
         ),
         timestamp_utc=None,
     )
+
+import json
+from pathlib import Path
+from typing import Any
+
+import pytest
+
+
+FIXTURES_DIR = Path(__file__).parent / "fixtures"
+SAMPLE_MCQ_OUTPUTS_PATH = FIXTURES_DIR / "sample_mcq_outputs.json"
+
+
+@pytest.fixture(scope="session")
+def sample_mcq_outputs() -> dict[str, Any]:
+    """
+    Load sample parser/scoring cases from disk.
+
+    Returns:
+        Dictionary containing options, gold choice, and raw model-output cases.
+    """
+    with SAMPLE_MCQ_OUTPUTS_PATH.open("r", encoding="utf-8") as file:
+        return json.load(file)
+
+
+@pytest.fixture(scope="session")
+def sample_options(sample_mcq_outputs: dict[str, Any]) -> dict[str, str]:
+    """
+    Return the sample answer options mapping used by parser tests.
+    """
+    return sample_mcq_outputs["options"]
+
+
+@pytest.fixture(scope="session")
+def sample_gold_choice(sample_mcq_outputs: dict[str, Any]) -> str:
+    """
+    Return the sample gold choice used by scoring tests.
+    """
+    return sample_mcq_outputs["gold_choice"]
+
+
+@pytest.fixture(scope="session")
+def sample_case_map(sample_mcq_outputs: dict[str, Any]) -> dict[str, dict[str, Any]]:
+    """
+    Index sample cases by case name for convenient lookup in tests.
+    """
+    return {case["name"]: case for case in sample_mcq_outputs["cases"]}

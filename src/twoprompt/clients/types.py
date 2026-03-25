@@ -1,3 +1,5 @@
+# src/twoprompt/clients/types.py
+
 from numbers import Real
 
 from twoprompt.config.models import (
@@ -14,49 +16,41 @@ VALID_STATUS = {SUCCESS_STATUS, FAILURE_STATUS}
 
 class ValidationError(Exception):
     """Base exception for validation failures in client request/response types."""
-
     pass
 
 
 class RequestValidationError(ValidationError):
     """Raised when a ModelRequest or its attached metadata contains invalid, missing, or inconsistent values."""
-
     pass
 
 
 class ResponseValidationError(ValidationError):
     """Raised when a ModelResponse contains invalid, missing, or internally inconsistent values."""
-
     pass
 
 
 class ProviderConfigurationError(Exception):
     """Raised when a provider or model configuration is unsupported, missing, or incompatible with the current client setup."""
-
     pass
 
 
 class ProviderCallError(Exception):
     """Base exception for failures that occur while communicating with an external model provider."""
-
     pass
 
 
 class ProviderTimeoutError(ProviderCallError):
     """Raised when a provider request exceeds the allowed timeout."""
-
     pass
 
 
 class ProviderRateLimitError(ProviderCallError):
     """Raised when a provider rejects a request because the rate limit or quota has been exceeded."""
-
     pass
 
 
 class ProviderResponseError(ProviderCallError):
     """Raised when a provider returns a malformed, incomplete, or otherwise unusable response."""
-
     pass
 
 

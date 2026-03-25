@@ -1,3 +1,5 @@
+# src/twoprompt/clients/gemini_client.py
+
 from google import genai
 from google.genai import types, errors
 
@@ -15,6 +17,8 @@ from twoprompt.clients.types import (
 
 
 class GeminiClient(BaseClient):
+    """Async client for the Google Gemini API."""
+
     def __init__(
         self,
         model_name: str,
@@ -103,11 +107,11 @@ class GeminiClient(BaseClient):
             provider=request.provider,
             model_name=request.model_name,
             status=SUCCESS_STATUS,
-            latency_seconds=0.0, #handled in generate()
+            latency_seconds=0.0,  # handled in generate()
             metadata=request.metadata,
             raw_text=raw_text,
             finish_reason=finish_reason,
             usage=usage,
             error=None,
-            timestamp_utc=None, #handled in generate()
+            timestamp_utc=None,  # handled in generate()
         )

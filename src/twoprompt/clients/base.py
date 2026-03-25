@@ -1,10 +1,10 @@
-from __future__ import annotations
+# src/twoprompt/clients/base.py
 
+from __future__ import annotations
 
 import asyncio
 import time
 from abc import ABC, abstractmethod
-
 
 from twoprompt.clients.types import (
     ValidationError,
@@ -17,8 +17,6 @@ from twoprompt.clients.types import (
     ModelRequest,
     ModelResponse,
 )
-
-
 from twoprompt.config.models import MAX_RETRIES, TIMEOUT
 
 
@@ -100,8 +98,6 @@ class BaseClient(ABC):
                 latency_seconds=latency_seconds,
             )
 
-
-
     async def generate_batch(
         self,
         requests: list[ModelRequest],
@@ -151,10 +147,14 @@ class BaseClient(ABC):
             request: Standardized model request to check.
         """
         if request.provider != self.provider:
-            raise ProviderConfigurationError(f"Mismatch between request provider ({request.provider} and client provider ({self.provider}")
+            raise ProviderConfigurationError(
+                f"Mismatch between request provider ({request.provider} and client provider ({self.provider}"
+            )
 
         if request.model_name != self.model_name:
-            raise ProviderConfigurationError(f"Mismatch between request model ({request.model_name} and client model ({self.model_name}")
+            raise ProviderConfigurationError(
+                f"Mismatch between request model ({request.model_name} and client model ({self.model_name}"
+            )
 
     def _build_failure_response(
         self,
@@ -188,9 +188,9 @@ class BaseClient(ABC):
         return response
 
     def _normalize_exception(
-            self,
-            exc: Exception,
-            stage: str,
+        self,
+        exc: Exception,
+        stage: str,
     ) -> ErrorInfo:
         """Convert a raw exception into standardized error information.
 

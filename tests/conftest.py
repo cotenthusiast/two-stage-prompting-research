@@ -1,5 +1,31 @@
+# tests/conftest.py
+
+import json
+from pathlib import Path
+from typing import Any
+
 import pandas as pd
 import pytest
+
+from twoprompt.clients.types import (
+    SUCCESS_STATUS,
+    FAILURE_STATUS,
+    ErrorInfo,
+    ModelRequest,
+    ModelResponse,
+    RequestMetadata,
+    UsageInfo,
+)
+from twoprompt.config.experiment import (
+    MMLU_QUESTIONS_PER_SUBJECT,
+    REVIEW_SUBJECTS,
+    ROBUSTNESS_SUBJECTS,
+)
+
+
+# ---------------------------------------------------------------------------
+# Raw and normalized question fixtures
+# ---------------------------------------------------------------------------
 
 
 @pytest.fixture
@@ -31,6 +57,7 @@ def sample_raw_dataframe() -> pd.DataFrame:
         ]
     )
 
+
 @pytest.fixture
 def sample_normalized_row() -> dict[str, object]:
     return {
@@ -44,6 +71,7 @@ def sample_normalized_row() -> dict[str, object]:
         "correct_option": "C",
         "correct_answer_text": "HTTPS",
     }
+
 
 @pytest.fixture
 def sample_normalized_dataframe() -> pd.DataFrame:
@@ -74,11 +102,10 @@ def sample_normalized_dataframe() -> pd.DataFrame:
         ]
     )
 
-from twoprompt.config.experiment import (
-    MMLU_QUESTIONS_PER_SUBJECT,
-    REVIEW_SUBJECTS,
-    ROBUSTNESS_SUBJECTS,
-)
+
+# ---------------------------------------------------------------------------
+# Split test helpers and fixtures
+# ---------------------------------------------------------------------------
 
 
 def _make_normalized_rows(subjects: list[str], n_per_subject: int) -> list[dict[str, object]]:
@@ -238,17 +265,10 @@ def full_default_review_subjects() -> list[str]:
 def full_default_robustness_subjects() -> list[str]:
     return ROBUSTNESS_SUBJECTS
 
-import pytest
 
-from twoprompt.clients.types import (
-    SUCCESS_STATUS,
-    FAILURE_STATUS,
-    ErrorInfo,
-    ModelRequest,
-    ModelResponse,
-    RequestMetadata,
-    UsageInfo,
-)
+# ---------------------------------------------------------------------------
+# Client type fixtures
+# ---------------------------------------------------------------------------
 
 
 @pytest.fixture
@@ -315,11 +335,10 @@ def failed_response(valid_metadata: RequestMetadata) -> ModelResponse:
         timestamp_utc=None,
     )
 
-import json
-from pathlib import Path
-from typing import Any
 
-import pytest
+# ---------------------------------------------------------------------------
+# Parser / scorer test fixtures
+# ---------------------------------------------------------------------------
 
 
 FIXTURES_DIR = Path(__file__).parent / "fixtures"

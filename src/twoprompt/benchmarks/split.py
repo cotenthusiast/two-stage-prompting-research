@@ -1,38 +1,48 @@
+# src/twoprompt/benchmarks/split.py
+
 from typing import Any
-import pandas as pd
+
 import numpy as np
+import pandas as pd
+
 from twoprompt.config.experiment import (
-    ROBUSTNESS_TRACK_NAME,
-    ROBUSTNESS_SUBJECTS,
-    ROBUSTNESS_QUESTIONS_PER_SUBJECT,
-    REVIEW_TRACK_NAME,
-    REVIEW_SUBJECTS,
     REVIEW_QUESTIONS_PER_SUBJECT,
-    ROBUSTNESS_SPLIT_SEED,
     REVIEW_SPLIT_SEED,
+    REVIEW_SUBJECTS,
+    REVIEW_TOTAL_QUESTIONS,
+    REVIEW_TRACK_NAME,
+    ROBUSTNESS_QUESTIONS_PER_SUBJECT,
+    ROBUSTNESS_SPLIT_SEED,
+    ROBUSTNESS_SUBJECTS,
     ROBUSTNESS_TOTAL_QUESTIONS,
-    REVIEW_TOTAL_QUESTIONS
+    ROBUSTNESS_TRACK_NAME,
 )
+
 
 class InsufficientQuestionsError(ValueError):
     """Raised when a split cannot sample enough eligible questions for a subject."""
     pass
 
+
 class SplitSizeMismatchError(ValueError):
     """Raised when a split does not contain the expected number of question IDs."""
     pass
+
 
 class DuplicateSplitIdsError(ValueError):
     """Raised when a split contains duplicate question IDs."""
     pass
 
+
 class UnknownSplitIdsError(ValueError):
     """Raised when a split contains question IDs not present in the dataset."""
     pass
 
+
 class OverlappingSplitIdsError(ValueError):
     """Raised when two or more splits contain the same question IDs."""
     pass
+
 
 def _build_stratified_split(
     df: pd.DataFrame,
@@ -94,6 +104,7 @@ def _build_stratified_split(
 
     return selected_ids
 
+
 def build_robustness_split(
     df: pd.DataFrame,
     subjects: list[str] = ROBUSTNESS_SUBJECTS,
@@ -106,6 +117,7 @@ def build_robustness_split(
     """
     return _build_stratified_split(df, subjects, per_subject, seed, exclude_ids)
 
+
 def build_review_split(
     df: pd.DataFrame,
     subjects: list[str] = REVIEW_SUBJECTS,
@@ -117,6 +129,7 @@ def build_review_split(
     Build the review split using the configured review defaults.
     """
     return _build_stratified_split(df, subjects, per_subject, seed, exclude_ids)
+
 
 def validate_split_ids(
     df: pd.DataFrame,
@@ -163,6 +176,7 @@ def validate_split_ids(
             f"Split contains question IDs not present in the dataset: {missing_ids}."
         )
 
+
 def assert_disjoint(
     split_map: dict[str, list[str]],
 ) -> None:
@@ -186,8 +200,11 @@ def assert_disjoint(
             next_row = set(split_items[j][1])
             intersection = current_row.intersection(next_row)
             if intersection:
-                raise OverlappingSplitIdsError(f"split {split_items[i][0]} and split {split_items[j][0]} are overlapping."
-                                               f"Overlapping question IDS: {intersection}")
+                raise OverlappingSplitIdsError(
+                    f"split {split_items[i][0]} and split {split_items[j][0]} are overlapping."
+                    f"Overlapping question IDS: {intersection}"
+                )
+
 
 def build_split_metadata(
     df: pd.DataFrame,
@@ -244,6 +261,7 @@ def build_split_metadata(
         "excluded_id_count": excluded_id_count,
     }
     return split_metadata
+
 
 def build_all_splits(
     df: pd.DataFrame,
@@ -312,8 +330,8 @@ def build_all_splits(
 
     return_dict = {}
     return_dict[ROBUSTNESS_TRACK_NAME] = {
-        "ids" : robustness_split_ids,
-        "metadata" : robustness_metadata
+        "ids": robustness_split_ids,
+        "metadata": robustness_metadata
     }
 
     review_exclude_ids = exclude_ids.copy()
@@ -346,9 +364,8 @@ def build_all_splits(
     )
 
     return_dict[REVIEW_TRACK_NAME] = {
-        "ids" : review_split_ids,
-        "metadata" : review_metadata
+        "ids": review_split_ids,
+        "metadata": review_metadata
     }
-
 
     return return_dict

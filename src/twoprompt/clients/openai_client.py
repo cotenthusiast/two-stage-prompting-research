@@ -1,3 +1,5 @@
+# src/twoprompt/clients/openai_client.py
+
 import openai
 from openai import AsyncOpenAI
 
@@ -15,6 +17,8 @@ from twoprompt.clients.types import (
 
 
 class OpenAIClient(BaseClient):
+    """Async client for the OpenAI API."""
+
     def __init__(
         self,
         model_name: str,

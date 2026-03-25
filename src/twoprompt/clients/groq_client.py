@@ -1,3 +1,5 @@
+# src/twoprompt/clients/groq_client.py
+
 import groq
 from groq import AsyncGroq
 
@@ -15,6 +17,8 @@ from twoprompt.clients.types import (
 
 
 class GroqClient(BaseClient):
+    """Async client for the Groq API."""
+
     def __init__(
         self,
         model_name: str,

@@ -1,9 +1,12 @@
-#src/twoprompt/benchmarks/mmlu.py
+# src/twoprompt/benchmarks/mmlu.py
 
-import hashlib
 import ast
+import hashlib
+
 import pandas as pd
+
 from twoprompt.config.experiment import MCQ_ANSWER_MAP
+
 
 def normalize_row(row: dict[str, object]) -> dict[str, object]:
     """
@@ -28,7 +31,7 @@ def normalize_row(row: dict[str, object]) -> dict[str, object]:
             - correct_option
             - correct_answer_text
     """
-    subject, question, choices, answer = row["subject"],row["question"], row["choices"], row["answer"]
+    subject, question, choices, answer = row["subject"], row["question"], row["choices"], row["answer"]
     parsed_choices = ast.literal_eval(choices)
     choice_a, choice_b, choice_c, choice_d = parsed_choices[0], parsed_choices[1], parsed_choices[2], parsed_choices[3]
     answer = MCQ_ANSWER_MAP[answer]
@@ -42,7 +45,7 @@ def normalize_row(row: dict[str, object]) -> dict[str, object]:
         correct_answer_text = choice_c
     else:
         correct_answer_text = choice_d
-    return({
+    return ({
         "question_id": question_id,
         "subject": subject,
         "question_text": question,
@@ -53,6 +56,7 @@ def normalize_row(row: dict[str, object]) -> dict[str, object]:
         "correct_option": answer,
         "correct_answer_text": correct_answer_text,
     })
+
 
 def build_normalized_dataframe(df: pd.DataFrame) -> pd.DataFrame:
     """
@@ -74,10 +78,10 @@ def build_normalized_dataframe(df: pd.DataFrame) -> pd.DataFrame:
     rows = []
     for _, row in df.iterrows():
         row_dict = {
-            "subject" : row["subject"],
-            "question" : row["question"],
-            "choices" : row["choices"],
-            "answer" : row["answer"]
+            "subject": row["subject"],
+            "question": row["question"],
+            "choices": row["choices"],
+            "answer": row["answer"]
         }
         rows.append(normalize_row(row_dict))
     return pd.DataFrame(rows)

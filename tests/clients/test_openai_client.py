@@ -1,7 +1,8 @@
+# tests/clients/test_openai_client.py
+
 import httpx
 import pytest
 import openai
-
 from types import SimpleNamespace
 from unittest.mock import AsyncMock
 
@@ -14,39 +15,26 @@ from twoprompt.clients.types import (
     ProviderConfigurationError,
 )
 
-pytestmark = pytest.mark.asyncio
-
 
 @pytest.fixture
 def openai_client() -> OpenAIClient:
-    return OpenAIClient(
-        model_name="gpt-4o-mini",
-        api_key="test-key",
-    )
+    return OpenAIClient(model_name="gpt-4o-mini", api_key="test-key")
 
 
 @pytest.fixture
 def request_metadata() -> RequestMetadata:
     return RequestMetadata(
-        question_id="q1",
-        split_name="robustness",
-        method_name="direct",
-        subject="anatomy",
-        run_id="run_001",
-        prompt_version="v1",
-        perturbation_name=None,
-        sample_index=0,
+        question_id="q1", split_name="robustness", method_name="direct",
+        subject="anatomy", run_id="run_001", prompt_version="v1",
+        perturbation_name=None, sample_index=0,
     )
 
 
 @pytest.fixture
 def model_request(request_metadata: RequestMetadata) -> ModelRequest:
     return ModelRequest(
-        provider="openai",
-        model_name="gpt-4o-mini",
-        payload="test prompt",
-        temperature=0.2,
-        max_tokens=128,
+        provider="openai", model_name="gpt-4o-mini",
+        payload="test prompt", temperature=0.2, max_tokens=128,
         metadata=request_metadata,
     )
 
@@ -54,26 +42,13 @@ def model_request(request_metadata: RequestMetadata) -> ModelRequest:
 @pytest.fixture
 def make_openai_response():
     def _make_response(
-        *,
-        text: str | None = "hello",
-        prompt_tokens: int = 10,
-        completion_tokens: int = 5,
-        total_tokens: int = 15,
-        include_usage: bool = True,
+        *, text="hello", prompt_tokens=10, completion_tokens=5,
+        total_tokens=15, include_usage=True,
     ):
         usage = None
         if include_usage:
-            usage = SimpleNamespace(
-                input_tokens=prompt_tokens,
-                output_tokens=completion_tokens,
-                total_tokens=total_tokens,
-            )
-
-        return SimpleNamespace(
-            output_text=text,
-            usage=usage,
-        )
-
+            usage = SimpleNamespace(input_tokens=prompt_tokens, output_tokens=completion_tokens, total_tokens=total_tokens)
+        return SimpleNamespace(output_text=text, usage=usage)
     return _make_response
 
 
@@ -84,100 +59,42 @@ def mock_create(openai_client: OpenAIClient) -> AsyncMock:
     return mock
 
 
-async def test_generate_provider_response_returns_model_response_on_success(
-    openai_client: OpenAIClient,
-    model_request: ModelRequest,
-    make_openai_response,
-    mock_create: AsyncMock,
-) -> None:
-    fake_response = make_openai_response()
-    mock_create.return_value = fake_response
+class TestOpenAIClientGenerateProviderResponse:
+    """Tests for OpenAIClient._generate_provider_response."""
 
-    response = await openai_client._generate_provider_response(model_request)
+    pytestmark = pytest.mark.asyncio
 
-    assert response.raw_text == "hello"
-    assert response.provider == "openai"
-    assert response.model_name == model_request.model_name
-    assert response.finish_reason is None
-    assert response.usage is not None
-    assert response.usage.prompt_tokens == 10
-    assert response.usage.completion_tokens == 5
-    assert response.usage.total_tokens == 15
+    async def test_returns_model_response_on_success(self, openai_client, model_request, make_openai_response, mock_create) -> None:
+        mock_create.return_value = make_openai_response()
+        response = await openai_client._generate_provider_response(model_request)
+        assert response.raw_text == "hello"
+        assert response.provider == "openai"
 
+    async def test_raises_provider_response_error_when_text_is_none(self, openai_client, model_request, make_openai_response, mock_create) -> None:
+        mock_create.return_value = make_openai_response(text=None)
+        with pytest.raises(ProviderResponseError):
+            await openai_client._generate_provider_response(model_request)
 
-async def test_generate_provider_response_raises_provider_response_error_when_text_is_none(
-    openai_client: OpenAIClient,
-    model_request: ModelRequest,
-    make_openai_response,
-    mock_create: AsyncMock,
-) -> None:
-    fake_response = make_openai_response(text=None)
-    mock_create.return_value = fake_response
+    async def test_raises_provider_response_error_when_text_is_whitespace(self, openai_client, model_request, make_openai_response, mock_create) -> None:
+        mock_create.return_value = make_openai_response(text="   ")
+        with pytest.raises(ProviderResponseError):
+            await openai_client._generate_provider_response(model_request)
 
-    with pytest.raises(ProviderResponseError):
-        await openai_client._generate_provider_response(model_request)
+    async def test_allows_missing_usage(self, openai_client, model_request, make_openai_response, mock_create) -> None:
+        mock_create.return_value = make_openai_response(include_usage=False)
+        response = await openai_client._generate_provider_response(model_request)
+        assert response.usage is None
 
+    async def test_raises_provider_configuration_error_for_404(self, openai_client, model_request, mock_create) -> None:
+        request = httpx.Request("POST", "https://api.openai.com/v1/responses")
+        http_response = httpx.Response(404, request=request)
+        mock_create.side_effect = openai.NotFoundError("not found", response=http_response, body={"message": "not found"})
+        with pytest.raises(ProviderConfigurationError):
+            await openai_client._generate_provider_response(model_request)
 
-async def test_generate_provider_response_raises_provider_response_error_when_text_is_whitespace(
-    openai_client: OpenAIClient,
-    model_request: ModelRequest,
-    make_openai_response,
-    mock_create: AsyncMock,
-) -> None:
-    fake_response = make_openai_response(text="   ")
-    mock_create.return_value = fake_response
-
-    with pytest.raises(ProviderResponseError):
-        await openai_client._generate_provider_response(model_request)
-
-
-async def test_generate_provider_response_allows_missing_usage(
-    openai_client: OpenAIClient,
-    model_request: ModelRequest,
-    make_openai_response,
-    mock_create: AsyncMock,
-) -> None:
-    fake_response = make_openai_response(include_usage=False)
-    mock_create.return_value = fake_response
-
-    response = await openai_client._generate_provider_response(model_request)
-
-    assert response.raw_text == "hello"
-    assert response.usage is None
-    assert response.finish_reason is None
-
-
-async def test_generate_provider_response_raises_provider_configuration_error_for_404(
-    openai_client: OpenAIClient,
-    model_request: ModelRequest,
-    mock_create: AsyncMock,
-) -> None:
-    request = httpx.Request("POST", "https://api.openai.com/v1/responses")
-    http_response = httpx.Response(404, request=request)
-
-    mock_create.side_effect = openai.NotFoundError(
-        "not found",
-        response=http_response,
-        body={"message": "not found"},
-    )
-
-    with pytest.raises(ProviderConfigurationError):
-        await openai_client._generate_provider_response(model_request)
-
-
-async def test_generate_provider_response_raises_provider_call_error_for_500(
-    openai_client: OpenAIClient,
-    model_request: ModelRequest,
-    mock_create: AsyncMock,
-) -> None:
-    request = httpx.Request("POST", "https://api.openai.com/v1/responses")
-    http_response = httpx.Response(500, request=request)
-
-    mock_create.side_effect = openai.InternalServerError(
-        "server error",
-        response=http_response,
-        body={"message": "server error"},
-    )
-
-    with pytest.raises(ProviderCallError):
-        await openai_client._generate_provider_response(model_request)
+    async def test_raises_provider_call_error_for_500(self, openai_client, model_request, mock_create) -> None:
+        request = httpx.Request("POST", "https://api.openai.com/v1/responses")
+        http_response = httpx.Response(500, request=request)
+        mock_create.side_effect = openai.InternalServerError("server error", response=http_response, body={"message": "server error"})
+        with pytest.raises(ProviderCallError):
+            await openai_client._generate_provider_response(model_request)

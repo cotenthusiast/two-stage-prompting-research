@@ -58,9 +58,6 @@ def write_split_ids(
         artifact_group: Storage namespace that separates benchmark, faithfulness,
             and stronger-model artifacts.
 
-    Returns:
-        Path to the written split-IDs artifact.
-
     Notes:
         This function is responsible only for persistence of the ID list for one
         split. It should not compute metadata or validate split correctness.
@@ -88,9 +85,6 @@ def write_split_metadata(
         output_dir: Root directory under which split artifacts should be written.
         artifact_group: Storage namespace that separates benchmark, faithfulness,
             and stronger-model artifacts.
-
-    Returns:
-        Path to the written metadata artifact.
 
     Notes:
         The metadata is expected to already be built before this function is called.
@@ -121,14 +115,10 @@ def write_group_splits(
         artifact_group: Storage namespace that separates benchmark, faithfulness,
             and stronger-model artifacts.
 
-    Returns:
-        Mapping from logical artifact names to the paths that were written.
-
     Notes:
         This is the top-level split writer for the phase. It delegates to the
         single-split writer functions rather than duplicating file logic.
     """
-
     for split_name, split_artifact in split_artifacts.items():
         write_split_ids(
             split_artifact["ids"],
@@ -142,3 +132,33 @@ def write_group_splits(
             output_dir,
             artifact_group,
         )
+
+
+def write_run_results(
+    results: list[dict[str, Any]],
+    output_dir: Path,
+    run_id: str,
+    method_name: str,
+    model_name: str,
+) -> Path:
+    """Write experiment results to a CSV file.
+
+    The filename encodes the run ID, method, and model so that
+    results from different conditions never overwrite each other.
+
+    Args:
+        results: List of flat result dictionaries produced by a runner.
+        output_dir: Directory where the CSV file should be written.
+        run_id: Unique identifier for this experimental run.
+        method_name: Experimental condition name.
+        model_name: Model that produced the results.
+
+    Returns:
+        Path to the written CSV file.
+    """
+    output_dir.mkdir(parents=True, exist_ok=True)
+    filename = f"{run_id}_{method_name}_{model_name}.csv"
+    output_path = output_dir / filename
+
+    pd.DataFrame(results).to_csv(output_path, index=False)
+    return output_path

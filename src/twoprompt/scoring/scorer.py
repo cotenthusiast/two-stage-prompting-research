@@ -1,3 +1,5 @@
+# src/twoprompt/scoring/scorer.py
+
 from twoprompt.parsing.types import PARSE_OK, ParseResult
 from twoprompt.scoring.types import (
     SCORE_CORRECT,

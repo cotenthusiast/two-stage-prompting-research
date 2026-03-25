@@ -13,12 +13,13 @@ GEMINI_API_KEY = os.getenv("GEMINI_API_KEY")
 OPENAI_API_KEY = os.getenv("OPENAI_API_KEY")
 GROQ_API_KEY = os.getenv("GROQ_API_KEY")
 
-if GEMINI_API_KEY is None:
-    print("Gemini API key missing")
-if OPENAI_API_KEY is None:
-    print("OpenAI API key missing")
-if GROQ_API_KEY is None:
-    print("Groq API key missing")
+def validate_api_keys():
+    if GEMINI_API_KEY is None:
+        print("Gemini API key missing")
+    if OPENAI_API_KEY is None:
+        print("OpenAI API key missing")
+    if GROQ_API_KEY is None:
+        print("Groq API key missing")
 
 # Default request settings ----------------------------------------------
 SEED = 42

@@ -1,12 +1,10 @@
 #src/twoprompt/config/paths.py
 
 from pathlib import Path
-from twoprompt.config.filenames import *
 
 # Root ------------------------------------------------
 CURRENT_FILE = Path(__file__).resolve()
 ROOT_DIR = CURRENT_FILE.parent.parent
-
 # Directories ----------------------------------------
 DATA_DIR = ROOT_DIR / "data"
 RAW_DIR = DATA_DIR / "raw"
@@ -29,7 +27,14 @@ for directory in [
     LOG_DIR,
 ]:
     directory.mkdir(parents=True, exist_ok=True)
+# Filenames ------------------------------------------
+RAW_QUESTIONS_FILENAME = "mmlu_raw.csv"
+NORMALIZED_QUESTIONS_FILENAME = "mmlu_normalized.csv"
 
+BENCHMARK_SPLIT_FILENAME = "benchmark_split_ids.csv"
+FAITHFULNESS_SPLIT_FILENAME = "faithfulness_split_ids.csv"
+
+HUMAN_REVIEW_FILENAME = "faithfulness_human_review.csv"
 # Full file paths ------------------------------------
 RAW_QUESTIONS_PATH = RAW_DIR / RAW_QUESTIONS_FILENAME
 NORMALIZED_QUESTIONS_PATH = PROCESSED_DIR / NORMALIZED_QUESTIONS_FILENAME

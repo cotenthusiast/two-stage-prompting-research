@@ -1,7 +1,7 @@
 # src/twoprompt/config/experiment.py
 
 # MMLU dataset constants --------------------------------
-MCQ_ANSWER_MAP = "ABCDEFG"
+MCQ_ANSWER_MAP = {0: "A", 1: "B", 2: "C", 3: "D"}
 MMLU_QUESTIONS_PER_SUBJECT = 50
 
 # Shared method names -----------------------------------

@@ -1,3 +1,5 @@
+# src/twoprompt/config/prompts.py
+
 PROMPTS = {
     "direct_mcq": """Answer the following multiple-choice question.
 

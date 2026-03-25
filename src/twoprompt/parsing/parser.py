@@ -1,10 +1,11 @@
+# src/twoprompt/parsing/parser.py
+
 from __future__ import annotations
 
 from collections.abc import Collection, Mapping
 
 from twoprompt.parsing.types import (
     PARSE_AMBIGUOUS,
-    PARSE_INVALID,
     PARSE_MISSING,
     PARSE_OK,
     ParseResult,
@@ -40,7 +41,6 @@ def normalize_output_text(raw_text: str | None) -> str:
     return normalized_string
 
 
-
 def extract_choice_letter(
     normalized_text: str,
     valid_choices: Collection[str] = DEFAULT_VALID_CHOICES,
@@ -72,9 +72,9 @@ def extract_choice_letter(
             reason="No output to parse"
         )
     words = normalized_text.split()
-    for i in range (len(words)):
-        words[i] = words[i].strip('()[]{}<>".,:;!?'+"'")
-    if len(words) == 1 and words[0].upper() in valid_choices: # high confidenceS
+    for i in range(len(words)):
+        words[i] = words[i].strip('()[]{}<>".,:;!?' + "'")
+    if len(words) == 1 and words[0].upper() in valid_choices:
         return ParseResult(
             final_choice=words[0].upper(),
             status=PARSE_OK,
@@ -85,7 +85,7 @@ def extract_choice_letter(
     cue_words = {"answer", "choice", "option"}
     strong_candidates = []
     weak_candidates = []
-    for i in range (len(words)):
+    for i in range(len(words)):
         if i + 3 < len(words) and words[i].lower() == "final" and words[i+1].lower() == "answer" and words[i+2].lower() == "is" and words[i+3].upper() in valid_choices:
             strong_candidates.append(words[i + 3].upper())
         if (i + 2 < len(words) and words[i].lower() in cue_words and words[i+1].lower() == "is" and words[i+2].upper() in valid_choices) or (i + 2 < len(words) and words[i].lower() == "final" and words[i+1].lower() == "answer" and words[i+2].upper() in valid_choices):

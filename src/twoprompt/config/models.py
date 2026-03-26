@@ -40,7 +40,7 @@ SUPPORTED_PROVIDERS = {
 }
 
 # Core / cheaper models -------------------------------------------------
-OPENAI_CORE_MODEL = "gpt-5-mini"
+OPENAI_CORE_MODEL = "gpt-4.1-mini"
 GEMINI_CORE_MODEL = "gemini-2.5-flash"
 GROQ_CORE_MODEL = "llama-3.1-8b-instant"
 
@@ -51,7 +51,7 @@ CORE_MODELS = [
 ]
 
 # Stronger models -------------------------------------------------------
-OPENAI_STRONG_MODEL = "gpt-5.4"
+OPENAI_STRONG_MODEL = "gpt-4.1"
 GEMINI_STRONG_MODEL = "gemini-2.5-pro"
 GROQ_STRONG_MODEL = "llama-3.3-70b-versatile"
 

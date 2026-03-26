@@ -7,14 +7,14 @@ MMLU_QUESTIONS_PER_SUBJECT = 50
 # Shared method names -----------------------------------
 BASELINE_METHOD = "baseline"
 TWOPROMPT_METHOD = "two_prompt"
-PRIDE_METHOD = "pride"
-TWOPROMPT_PRIDE_METHOD = "two_prompt_pride"
+CYCLIC_METHOD = "cyclic"
+TWOPROMPT_CYCLIC_METHOD = "two_prompt_cyclic"
 
 ALL_METHODS = [
     BASELINE_METHOD,
     TWOPROMPT_METHOD,
-    PRIDE_METHOD,
-    TWOPROMPT_PRIDE_METHOD,
+    CYCLIC_METHOD,
+    TWOPROMPT_CYCLIC_METHOD,
 ]
 
 # Track A: robustness / accuracy ------------------------
@@ -82,16 +82,16 @@ ROBUSTNESS_TOTAL_QUESTIONS = (
 ROBUSTNESS_METHODS = [
     BASELINE_METHOD,
     TWOPROMPT_METHOD,
-    PRIDE_METHOD,
-    TWOPROMPT_PRIDE_METHOD,
+    CYCLIC_METHOD,
+    TWOPROMPT_CYCLIC_METHOD,
 ]
 
 ROBUSTNESS_SPLIT_SEED = 42
 
-# Track B: review split ---------------------------------
-# This single review split is reused for:
-# 1) faithfulness / human-review analysis
-# 2) stronger-model evaluation
+# Shared review split -----------------------------------
+# This single split is reused for:
+# 1) stronger-model evaluation
+# 2) faithfulness / human-review analysis
 REVIEW_TRACK_NAME = "review"
 
 REVIEW_SUBJECTS = [
@@ -120,16 +120,24 @@ REVIEW_SUBJECTS = [
 REVIEW_NO_OF_SUBJECTS = len(REVIEW_SUBJECTS)
 REVIEW_QUESTIONS_PER_SUBJECT = 3
 REVIEW_TOTAL_QUESTIONS = REVIEW_NO_OF_SUBJECTS * REVIEW_QUESTIONS_PER_SUBJECT
-
-STRONG_MODELS_USE_REVIEW_SPLIT = True
+REVIEW_SPLIT_SEED = 42
 
 REVIEW_METHODS = [
     BASELINE_METHOD,
     TWOPROMPT_METHOD,
-    PRIDE_METHOD,
-    TWOPROMPT_PRIDE_METHOD,
+    CYCLIC_METHOD,
+    TWOPROMPT_CYCLIC_METHOD,
 ]
-REVIEW_SPLIT_SEED = 42
+
+# Track B: stronger models ------------------------------
+STRONG_MODELS_TRACK_NAME = "strong_models"
+STRONG_MODELS_USE_REVIEW_SPLIT = True
+STRONG_MODELS_METHODS = REVIEW_METHODS
+
+# Track C: faithfulness ---------------------------------
+FAITHFULNESS_TRACK_NAME = "faithfulness"
+FAITHFULNESS_USE_REVIEW_SPLIT = True
+FAITHFULNESS_METHODS = REVIEW_METHODS
 
 # Review / scoring protocols ----------------------------
 ANSWER_MATCHING_PROTOCOL = "answer_matching"
@@ -141,15 +149,12 @@ REVIEW_PROTOCOLS = [
 ]
 
 # Backwards-compatible aliases --------------------------
-# Keep these for now if other files still import the old names.
 BENCHMARK_TOTAL_QUESTIONS = ROBUSTNESS_TOTAL_QUESTIONS
 BENCHMARK_SUBJECTS = ROBUSTNESS_SUBJECTS
 
-FAITHFULNESS_TRACK_NAME = REVIEW_TRACK_NAME
 FAITHFULNESS_SUBJECTS = REVIEW_SUBJECTS
 FAITHFULNESS_QUESTIONS_PER_SUBJECT = REVIEW_QUESTIONS_PER_SUBJECT
 FAITHFULNESS_TOTAL_QUESTIONS = REVIEW_TOTAL_QUESTIONS
-FAITHFULNESS_METHODS = REVIEW_METHODS
 
 # Human review labels -----------------------------------
 HUMAN_LABEL_CORRECT = "correct"

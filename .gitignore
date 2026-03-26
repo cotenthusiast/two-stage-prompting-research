@@ -41,3 +41,7 @@ reports/notes/*
 # Logs
 logs/*
 !logs/.gitkeep
+
+build/
+dist/
+*.egg-info/

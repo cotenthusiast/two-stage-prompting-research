@@ -33,8 +33,8 @@ from twoprompt.runners.two_stage_permutation import TwoStagePermutationRunner
 
 PROMPT_VERSION = "v1"
 
-ALL_METHODS = [BASELINE_METHOD, TWOPROMPT_METHOD, CYCLIC_METHOD, TWOPROMPT_CYCLIC_METHOD]
-GEMINI_METHODS = [BASELINE_METHOD, TWOPROMPT_METHOD, CYCLIC_METHOD]  #combined tomorrow
+ALL_METHODS = []
+GEMINI_METHODS = [TWOPROMPT_CYCLIC_METHOD]  #combined tomorrow
 
 
 def load_split_questions() -> list[dict]:
@@ -92,7 +92,7 @@ async def run_model(
 
 async def main():
     """Run experiment conditions across models."""
-    run_id = datetime.now(timezone.utc).strftime("%Y%m%d_%H%M%S")
+    run_id = "20260326_102510"  # hardcoded to append to existing run
     questions = load_split_questions()
 
     print(f"[start] Run ID: {run_id}")

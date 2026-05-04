@@ -6,11 +6,14 @@ import asyncio
 from abc import ABC, abstractmethod
 from typing import Any, Sequence
 
+from pathlib import Path
+
 from twoprompt.clients.base import BaseClient
 from twoprompt.clients.types import ModelRequest, ModelResponse, RequestMetadata
 from twoprompt.config.models import MAX_TOKENS, SEED, TEMPERATURE
 from twoprompt.parsing.parser import parse_model_answer
 from twoprompt.parsing.types import ParseResult
+from twoprompt.pipeline.prompt_builder import load_prompt_templates
 from twoprompt.scoring.scorer import score_prediction
 from twoprompt.scoring.types import ScoreResult
 
@@ -30,6 +33,7 @@ class ExperimentRunner(ABC):
             method_name: str,
             split_name: str,
             prompt_version: str,
+            prompts_dir: Path,
             run_id: str,
             temperature: float = TEMPERATURE,
             max_tokens: int = MAX_TOKENS,
@@ -45,6 +49,7 @@ class ExperimentRunner(ABC):
         self.max_tokens = max_tokens
         self.seed = seed
         self.perturbation_name = perturbation_name
+        self._prompts = load_prompt_templates(prompt_version, prompts_dir)
 
     @abstractmethod
     async def run_one(self, question_row: Any, sample_index: int) -> dict:

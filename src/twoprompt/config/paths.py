@@ -13,6 +13,7 @@ REVIEWS_DIR = DATA_DIR / "reviews"
 RUNS_DIR = ROOT_DIR / "runs"
 REPORTS_DIR = ROOT_DIR / "reports"
 LOG_DIR = ROOT_DIR / "logs"
+PROMPTS_DIR = ROOT_DIR / "prompts"
 
 for directory in [
     DATA_DIR,

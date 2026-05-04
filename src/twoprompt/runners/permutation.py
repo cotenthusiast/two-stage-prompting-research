@@ -33,7 +33,7 @@ class PermutationRunner(ExperimentRunner):
 
         # Build prompts and requests for each permutation
         prompts = [
-            self._build_permuted_prompt(question_row, perm)
+            self._build_permuted_prompt(question_row, perm, self._prompts["direct_mcq"])
             for perm in permutations
         ]
         requests = [
@@ -116,19 +116,26 @@ class PermutationRunner(ExperimentRunner):
     def _build_permuted_prompt(
             question_row: Any,
             permuted_options: dict[str, str],
+            template: str,
     ) -> str:
         """Build a direct MCQ prompt using a permuted option ordering.
 
         Args:
             question_row: Normalized question record.
             permuted_options: Permuted letter-to-text mapping.
+            template: Raw direct_mcq template string.
 
         Returns:
             Fully formatted prompt string with permuted options.
         """
+        vals = list(permuted_options.values())
         return build_direct_mcq_prompt(
-            question_row["question_text"],
-            *permuted_options.values(),
+            template=template,
+            question=question_row["question_text"],
+            option_a=vals[0],
+            option_b=vals[1],
+            option_c=vals[2],
+            option_d=vals[3],
         )
 
     @staticmethod

@@ -14,6 +14,7 @@ dependencies = [
     "openai",
     "google-genai",
     "groq",
+    "pyyaml",
 ]
 
 [project.optional-dependencies]

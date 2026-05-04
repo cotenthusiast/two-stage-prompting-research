@@ -11,6 +11,7 @@ from twoprompt.clients.types import (
     SUCCESS_STATUS,
     ProviderResponseError,
     ProviderCallError,
+    ProviderRateLimitError,
     ProviderTimeoutError,
     ProviderConfigurationError,
 )
@@ -25,6 +26,7 @@ class GroqClient(BaseClient):
         timeout: int = 30,
         concurrency_limit: int = 10,
         max_retries: int = 3,
+        min_delay_seconds: float = 0.0,
         api_key: str | None = None,
         base_url: str | None = None,
     ) -> None:
@@ -34,6 +36,7 @@ class GroqClient(BaseClient):
             timeout=timeout,
             concurrency_limit=concurrency_limit,
             max_retries=max_retries,
+            min_delay_seconds=min_delay_seconds,
         )
         self.client = AsyncGroq(
             api_key=api_key,
@@ -70,6 +73,9 @@ class GroqClient(BaseClient):
             raise ProviderCallError(str(exc)) from exc
         except groq.APIStatusError as exc:
             message = str(exc)
+
+            if exc.status_code == 429:
+                raise ProviderRateLimitError(message) from exc
 
             if exc.status_code in {400, 401, 403, 404, 422}:
                 raise ProviderConfigurationError(message) from exc

@@ -44,41 +44,86 @@ This project is positioned relative to approaches that require logit access (Pri
 The key distinction from chain-of-thought: CoT targets *reasoning quality*. The two-stage structure specifically targets *bias mitigation* by preventing option labels from influencing the generation step. These are different goals, and conflating them misframes what the method is trying to do.
  
 ## Repository Structure
- 
+
 ```
 two-prompt-research/
+├── config/        runtime configuration (default.yaml)
 ├── data/          benchmark data, normalized files, stratified splits
 ├── reports/       evaluation reports and paper-ready tables
 ├── runs/          raw outputs per experiment run
+├── checkpoints/   resumable run state (auto-created; gitignored)
 ├── scripts/       orchestration, evaluation, aggregation, reporting
 ├── src/twoprompt/ core package
+│   ├── clients/   provider clients (OpenAI, Gemini, Groq)
+│   ├── infra/     checkpointing, response caching
+│   ├── runners/   condition runners (baseline, two-stage, cyclic, …)
+│   └── …
 ├── tests/         test suite
 └── main.tex       paper draft
 ```
- 
+
 ## Setup
- 
+
 ```bash
 python -m venv .venv
 source .venv/bin/activate
 pip install -e .
 ```
- 
-## Running the Pipeline
- 
+
+Copy `.env.example` to `.env` and fill in your API keys:
+
 ```bash
-# Prepare benchmark data
+cp .env.example .env
+```
+
+## Configuration
+
+All run settings live in `config/default.yaml`. Edit that file to:
+
+- Change which models and methods run
+- Tune per-model rate-limit settings (`concurrency`, `min_delay_seconds`)
+- Adjust retry behaviour and checkpoint frequency
+- Add new models (add an entry under `models:` and a job under `run.jobs:`)
+
+The Python modules under `src/twoprompt/config/` are kept for backward compatibility with evaluation and analysis scripts and should not be edited for run configuration.
+
+## Running the Pipeline
+
+```bash
+# Prepare benchmark data (first time only)
 python -m scripts.prepare_data
- 
+
+# Dry-run: print call count, cost, and wall-clock estimate without making any API calls
+python -m scripts.run_experiment --dry-run
+
+# Run the full experiment (prompts for confirmation before starting)
+python -m scripts.run_experiment
+
+# Run overnight without the confirmation prompt
+python -m scripts.run_experiment --yes
+
+# Resume a previous run by passing its run ID
+python -m scripts.run_experiment --run-id 20260326_102510
+
+# Disable response caching for this run
+python -m scripts.run_experiment --no-cache
+
+# Use a custom config file
+python -m scripts.run_experiment --config config/my_config.yaml
+```
+
+The runner checkpoints every 50 questions per (model, method) job. If a run is interrupted — by a rate limit, crash, or manual stop — restarting with the same `--run-id` skips already-completed questions and continues from where it left off.
+
+```bash
 # Evaluate a completed run
 python -m scripts.evaluate_run <RUN_ID>
- 
+
 # Aggregate into paper-ready tables
 python -m scripts.aggregate_results <RUN_ID>
 ```
- 
+
 Example:
- 
+
 ```bash
 python -m scripts.evaluate_run 20260326_102510
 python -m scripts.aggregate_results 20260326_102510
@@ -93,11 +138,13 @@ python -m scripts.aggregate_results 20260326_102510
 Robustness is additionally assessed via mean absolute deviation from the ground-truth answer-position distribution, question-level overlap with the baseline condition, and raw unscorable and failure counts per model and condition.
  
 ## AI Usage Disclosure
- 
-The research question, hypothesis, experiment design, evaluation framing, and interpretation of results are my own. The core implementation in `src/` was written primarily by me with minimal AI assistance.
- 
+
+The research question, hypothesis, experiment design, evaluation framing, and interpretation of results are my own. The original core implementation in `src/` was written primarily by me with minimal AI assistance.
+
+The infrastructure refactor (checkpointing, response caching, retry/backoff, per-model rate-limit settings, YAML config, overnight orchestrator) was written with AI assistance under my direction and reviewed manually before merging.
+
 AI tools were used more substantially in the test suite (for repetitive fixtures and scaffolding) and in the scripts folder (for evaluation, aggregation, and report formatting utilities). Even there, metric definitions and any logic that directly affects paper claims were reviewed and corrected manually.
- 
+
 AI was also used for wording and revision support during paper drafting. The ideas, design decisions, and conclusions are my own.
  
 ## Why a Negative Result

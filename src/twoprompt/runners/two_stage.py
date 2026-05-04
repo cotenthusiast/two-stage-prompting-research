@@ -35,6 +35,7 @@ class TwoStageRunner(ExperimentRunner):
         """
         # Stage 1: free-text response
         free_text_prompt = build_free_text_prompt(
+            template=self._prompts["free_text"],
             question=question_row["question_text"],
         )
         free_text_request = self._build_model_request(
@@ -57,6 +58,7 @@ class TwoStageRunner(ExperimentRunner):
 
         # Stage 2: option matching using the free-text answer
         matching_prompt = build_option_matching_prompt(
+            template=self._prompts["option_matching"],
             question=question_row["question_text"],
             free_text=free_text_answer,
             option_a=question_row["choice_a"],

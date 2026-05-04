@@ -2,8 +2,8 @@
 
 from typing import Any
 
-from twoprompt.runners.base import ExperimentRunner
 from twoprompt.pipeline.prompt_builder import build_direct_mcq_prompt
+from twoprompt.runners.base import ExperimentRunner
 
 
 class DirectMCQRunner(ExperimentRunner):
@@ -48,8 +48,7 @@ class DirectMCQRunner(ExperimentRunner):
             score_result=score_result,
         )
 
-    @staticmethod
-    def _build_prompt(question_row: Any) -> str:
+    def _build_prompt(self, question_row: Any) -> str:
         """Build a direct multiple-choice prompt from a question row.
 
         Args:
@@ -59,6 +58,7 @@ class DirectMCQRunner(ExperimentRunner):
             Fully formatted direct MCQ prompt string.
         """
         return build_direct_mcq_prompt(
+            template=self._prompts["direct_mcq"],
             question=question_row["question_text"],
             option_a=question_row["choice_a"],
             option_b=question_row["choice_b"],

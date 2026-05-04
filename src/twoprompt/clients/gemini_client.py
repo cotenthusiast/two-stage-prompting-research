@@ -11,6 +11,7 @@ from twoprompt.clients.types import (
     SUCCESS_STATUS,
     ProviderResponseError,
     ProviderCallError,
+    ProviderRateLimitError,
     ProviderTimeoutError,
     ProviderConfigurationError,
 )
@@ -25,6 +26,7 @@ class GeminiClient(BaseClient):
         timeout: int = 30,
         concurrency_limit: int = 10,
         max_retries: int = 3,
+        min_delay_seconds: float = 0.0,
     ) -> None:
         super().__init__(
             provider="gemini",
@@ -32,6 +34,7 @@ class GeminiClient(BaseClient):
             timeout=timeout,
             concurrency_limit=concurrency_limit,
             max_retries=max_retries,
+            min_delay_seconds=min_delay_seconds,
         )
         self.client = genai.Client()
 
@@ -50,6 +53,9 @@ class GeminiClient(BaseClient):
             )
         except errors.APIError as exc:
             message = exc.message or str(exc)
+
+            if exc.code == 429:
+                raise ProviderRateLimitError(message) from exc
 
             if exc.code in {400, 401, 403, 404}:
                 raise ProviderConfigurationError(message) from exc

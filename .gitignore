@@ -26,6 +26,9 @@ data/splits/*
 data/reviews/*
 !data/reviews/.gitkeep
 
+# API response cache
+.cache/
+
 # Run outputs
 runs/*
 !runs/.gitkeep
@@ -45,3 +48,5 @@ logs/*
 build/
 dist/
 *.egg-info/
+
+HANDOFF.md

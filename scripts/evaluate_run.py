@@ -4,6 +4,7 @@ import argparse
 import sys
 from pathlib import Path
 
+import numpy as np
 import pandas as pd
 
 from twoprompt.config.experiment import (
@@ -12,6 +13,8 @@ from twoprompt.config.experiment import (
     TWOPROMPT_CYCLIC_METHOD,
 )
 from twoprompt.config.paths import REPORTS_DIR, RUNS_DIR
+from twoprompt.parsing.parser import parse_model_answer
+from twoprompt.scoring.scorer import score_prediction
 
 OPTIONS = ["A", "B", "C", "D"]
 
@@ -28,6 +31,68 @@ MODEL_ORDER = [
     "llama-3.1-8b-instant",
 ]
 
+N_BOOTSTRAP = 10_000
+BOOTSTRAP_SEED = 42
+_CI_LO = 2.5
+_CI_HI = 97.5
+
+_OPT_INDEX = {opt: i for i, opt in enumerate(OPTIONS)}
+
+
+def _bootstrap_ci_mean(values: np.ndarray, rng: np.random.Generator) -> tuple[float, float]:
+    """95% bootstrap CI for the mean, fully vectorised over all resamples."""
+    n = len(values)
+    idx = rng.integers(0, n, size=(N_BOOTSTRAP, n))
+    means = values[idx].mean(axis=1)
+    return float(np.percentile(means, _CI_LO)), float(np.percentile(means, _CI_HI))
+
+
+def _bootstrap_ci_mean_abs_deviation(
+    group: pd.DataFrame, rng: np.random.Generator
+) -> tuple[float, float]:
+    """95% bootstrap CI for mean_abs_deviation, vectorised over all resamples.
+
+    Resampling unit is individual questions (rows). For each resample the full
+    mean_abs_deviation statistic is recomputed, including the scored-only filter
+    on parsed_choice, mirroring compute_positional_bias exactly.
+    """
+    n = len(group)
+
+    def _enc(series: pd.Series) -> np.ndarray:
+        return np.array(
+            [
+                _OPT_INDEX.get(v, -1) if isinstance(v, str) else -1
+                for v in series.values
+            ],
+            dtype=np.int8,
+        )
+
+    gt_enc = _enc(group["correct_option"])    # (n,)
+    pred_enc = _enc(group["parsed_choice"])   # (n,) — -1 means not scored
+
+    # Draw all bootstrap indices at once: shape (N_BOOTSTRAP, n)
+    idx = rng.integers(0, n, size=(N_BOOTSTRAP, n))
+
+    gt_boot = gt_enc[idx]    # (N_BOOTSTRAP, n)
+    pred_boot = pred_enc[idx]  # (N_BOOTSTRAP, n)
+
+    scored_boot = pred_boot >= 0                    # (N_BOOTSTRAP, n)
+    total_scored = scored_boot.sum(axis=1).astype(float)  # (N_BOOTSTRAP,)
+
+    # Accumulate |pred_pct - gt_pct| across each option
+    total_abs_dev = np.zeros(N_BOOTSTRAP)
+    for k in range(len(OPTIONS)):
+        gt_pct = (gt_boot == k).sum(axis=1) / n * 100.0
+        pred_count = ((pred_boot == k) & scored_boot).sum(axis=1)
+        pred_pct = np.where(total_scored > 0, pred_count / total_scored * 100.0, 0.0)
+        total_abs_dev += np.abs(pred_pct - gt_pct)
+
+    stats = np.where(total_scored > 0, total_abs_dev / len(OPTIONS), np.nan)
+    valid = stats[~np.isnan(stats)]
+    if len(valid) == 0:
+        return (float("nan"), float("nan"))
+    return float(np.percentile(valid, _CI_LO)), float(np.percentile(valid, _CI_HI))
+
 
 def load_run(run_dir: Path) -> pd.DataFrame:
     """Load and concatenate all CSVs from a run directory."""
@@ -35,6 +100,61 @@ def load_run(run_dir: Path) -> pd.DataFrame:
     if not frames:
         raise FileNotFoundError(f"No CSV files found in {run_dir}")
     return pd.concat(frames, ignore_index=True)
+
+
+def reparse_run(df: pd.DataFrame) -> pd.DataFrame:
+    """Re-apply the current parser and scorer to eligible rows in-place.
+
+    Only rows whose answer came from a single raw API response are re-parsed.
+    Rows produced by majority voting (cyclic / two_prompt_cyclic) store
+    parse_reason == "majority_vote" and raw_text from only one of the N
+    permutation calls — re-parsing them from that single raw_text would
+    discard the other permutations and corrupt the result.  Those rows are
+    left exactly as they were saved by the original run.
+
+    Eligible rows must additionally have model_status != "failure" so that
+    raw_text is present.
+    """
+    df = df.copy()
+
+    reparsable_mask = (
+        (df["model_status"].fillna("") != "failure")
+        & (df["parse_reason"].fillna("") != "majority_vote")
+    )
+
+    parsed_choices = []
+    parse_statuses = []
+    normalized_texts = []
+    parse_reasons = []
+    is_corrects = []
+    score_statuses = []
+
+    for _, row in df[reparsable_mask].iterrows():
+        options = {
+            "A": row["choice_a"],
+            "B": row["choice_b"],
+            "C": row["choice_c"],
+            "D": row["choice_d"],
+        }
+        parse_result = parse_model_answer(row["raw_text"], options)
+        score_result = score_prediction(parse_result, row["correct_option"])
+
+        parsed_choices.append(parse_result.final_choice)
+        parse_statuses.append(parse_result.status)
+        normalized_texts.append(parse_result.normalized_text)
+        parse_reasons.append(parse_result.reason)
+        is_corrects.append(score_result.is_correct)
+        score_statuses.append(score_result.status)
+
+    idx = df.index[reparsable_mask]
+    df.loc[idx, "parsed_choice"] = parsed_choices
+    df.loc[idx, "parse_status"] = parse_statuses
+    df.loc[idx, "normalized_text"] = normalized_texts
+    df.loc[idx, "parse_reason"] = parse_reasons
+    df.loc[idx, "is_correct"] = is_corrects
+    df.loc[idx, "score_status"] = score_statuses
+
+    return df
 
 
 def _apply_display_order(df: pd.DataFrame) -> pd.DataFrame:
@@ -122,6 +242,7 @@ def compute_accuracy(df: pd.DataFrame) -> pd.DataFrame:
     - final_unscorable = rows where is_correct is missing
     """
     rows = []
+    rng = np.random.default_rng(BOOTSTRAP_SEED)
 
     for method in METHOD_ORDER:
         for model in MODEL_ORDER:
@@ -145,6 +266,19 @@ def compute_accuracy(df: pd.DataFrame) -> pd.DataFrame:
             correct = int(group["is_correct"].eq(True).sum())
             final_unscorable = int(group["is_correct"].isna().sum())
 
+            is_correct_vals = group["is_correct"].eq(True).to_numpy(dtype=np.float64)
+            e2e_ci_lo, e2e_ci_hi = _bootstrap_ci_mean(is_correct_vals, rng)
+
+            scored_vals = (
+                group.loc[group["is_correct"].notna(), "is_correct"]
+                .eq(True)
+                .to_numpy(dtype=np.float64)
+            )
+            if len(scored_vals) > 0:
+                cond_ci_lo, cond_ci_hi = _bootstrap_ci_mean(scored_vals, rng)
+            else:
+                cond_ci_lo, cond_ci_hi = float("nan"), float("nan")
+
             rows.append(
                 {
                     "method": method,
@@ -159,7 +293,11 @@ def compute_accuracy(df: pd.DataFrame) -> pd.DataFrame:
                     "correct": correct,
                     "final_unscorable": final_unscorable,
                     "end_to_end_accuracy": correct / total if total > 0 else 0.0,
+                    "end_to_end_accuracy_ci_lower": e2e_ci_lo,
+                    "end_to_end_accuracy_ci_upper": e2e_ci_hi,
                     "conditional_accuracy": correct / scored if scored > 0 else 0.0,
+                    "conditional_accuracy_ci_lower": cond_ci_lo,
+                    "conditional_accuracy_ci_upper": cond_ci_hi,
                     "api_failure_rate": api_failures / total if total > 0 else 0.0,
                     "parse_success_rate_nonprovider": (
                         parsed_nonprovider / api_successes if api_successes > 0 else 0.0
@@ -179,6 +317,7 @@ def compute_accuracy(df: pd.DataFrame) -> pd.DataFrame:
 def compute_positional_bias(df: pd.DataFrame) -> pd.DataFrame:
     """Prediction distribution and deviation from ground truth per method x model."""
     rows = []
+    rng = np.random.default_rng(BOOTSTRAP_SEED)
 
     for method in METHOD_ORDER:
         for model in MODEL_ORDER:
@@ -211,6 +350,11 @@ def compute_positional_bias(df: pd.DataFrame) -> pd.DataFrame:
                 deviations.append(abs(deviation))
 
             row["mean_abs_deviation"] = sum(deviations) / len(deviations)
+
+            mad_ci_lo, mad_ci_hi = _bootstrap_ci_mean_abs_deviation(group, rng)
+            row["mean_abs_deviation_ci_lower"] = mad_ci_lo
+            row["mean_abs_deviation_ci_upper"] = mad_ci_hi
+
             rows.append(row)
 
     result = pd.DataFrame(rows)
@@ -280,8 +424,10 @@ def compute_overlap(df: pd.DataFrame) -> pd.DataFrame:
             )
 
     result = pd.DataFrame(rows)
-    result = _apply_display_order(result)
-    return result.sort_values(["model", "method"]).reset_index(drop=True)
+    if not result.empty:
+        result = _apply_display_order(result)
+        result = result.sort_values(["model", "method"])
+    return result.reset_index(drop=True)
 
 
 # Choice shift analysis
@@ -439,6 +585,9 @@ def main() -> None:
     df = load_run(run_dir)
     print(f"[eval] {len(df)} total rows loaded")
 
+    print("[eval] Re-parsing responses with current parser...")
+    df = reparse_run(df)
+
     print("\n[eval] Validating run data...")
     validate_run(df, run_dir)
 
@@ -455,7 +604,11 @@ def main() -> None:
                 "scored",
                 "final_unscorable",
                 "end_to_end_accuracy",
+                "end_to_end_accuracy_ci_lower",
+                "end_to_end_accuracy_ci_upper",
                 "conditional_accuracy",
+                "conditional_accuracy_ci_lower",
+                "conditional_accuracy_ci_upper",
                 "api_failures",
                 "parse_failures",
             ]
@@ -465,7 +618,7 @@ def main() -> None:
     print("\n[eval] Computing positional bias...")
     bias = compute_positional_bias(df)
     bias.to_csv(report_dir / "positional_bias.csv", index=False)
-    print(bias[["method", "model", "n_scored", "mean_abs_deviation"]].to_string(index=False))
+    print(bias[["method", "model", "n_scored", "mean_abs_deviation", "mean_abs_deviation_ci_lower", "mean_abs_deviation_ci_upper"]].to_string(index=False))
 
     print("\n[eval] Computing question-level overlap...")
     overlap = compute_overlap(df)

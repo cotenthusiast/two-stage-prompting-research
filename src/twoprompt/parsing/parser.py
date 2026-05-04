@@ -48,13 +48,16 @@ def extract_choice_letter(
     """
     Attempt to extract a direct answer letter from normalized output.
 
-    Intended later behavior:
-    - Detect isolated answer letters such as A/B/C/D.
-    - Handle lowercase output by canonicalizing to uppercase.
-    - Prefer explicit final-answer style patterns when present.
-    - Return ambiguous if multiple conflicting letters are found.
-    - Return missing when no usable letter is present.
-    - Never raise because of malformed output.
+    Extraction priority (later occurrences always win within a tier):
+    1. Standalone single-token response.
+    2. Last strong cue pattern: "final answer is X", "answer is X",
+       "choice is X", "option is X", "final answer X", "answer X",
+       "choice X", "option X", "therefore X", "thus X"  (case-insensitive).
+    3. Last standalone A/B/C/D in the response when no strong cue matched.
+
+    Using last-occurrence rather than collecting all candidates avoids
+    false AMBIGUOUS results from reasoning models that enumerate options
+    before stating a final answer.
 
     Args:
         normalized_text: Pre-normalized model output text.
@@ -69,76 +72,103 @@ def extract_choice_letter(
             status=PARSE_MISSING,
             raw_text=None,
             normalized_text=normalized_text,
-            reason="No output to parse"
+            reason="No output to parse",
         )
+
     words = normalized_text.split()
-    for i in range(len(words)):
-        words[i] = words[i].strip('()[]{}<>".,:;!?' + "'")
-    if len(words) == 1 and words[0].upper() in valid_choices:
+    stripped = [w.strip('()[]{}<>".,:;!?' + "'") for w in words]
+
+    # Priority 1: single-token response
+    if len(stripped) == 1 and stripped[0].upper() in valid_choices:
         return ParseResult(
-            final_choice=words[0].upper(),
+            final_choice=stripped[0].upper(),
             status=PARSE_OK,
             raw_text=None,
             normalized_text=normalized_text,
-            reason="Answer successfully parsed"
+            reason="Answer successfully parsed",
         )
+
     cue_words = {"answer", "choice", "option"}
-    strong_candidates = []
-    weak_candidates = []
-    for i in range(len(words)):
-        if i + 3 < len(words) and words[i].lower() == "final" and words[i+1].lower() == "answer" and words[i+2].lower() == "is" and words[i+3].upper() in valid_choices:
-            strong_candidates.append(words[i + 3].upper())
-        if (i + 2 < len(words) and words[i].lower() in cue_words and words[i+1].lower() == "is" and words[i+2].upper() in valid_choices) or (i + 2 < len(words) and words[i].lower() == "final" and words[i+1].lower() == "answer" and words[i+2].upper() in valid_choices):
-            strong_candidates.append(words[i + 2].upper())
-        if i + 1 < len(words) and words[i].lower() in cue_words and words[i+1].upper() in valid_choices:
-            strong_candidates.append(words[i + 1].upper())
-        if words[i] in valid_choices:
-            weak_candidates.append(words[i])
+    concluding_words = {"therefore", "thus"}
 
-    unique_strong_candidates = set(strong_candidates)
-    unique_weak_candidates = set(weak_candidates)
+    # last_strong / last_weak: (word_index, letter) — updated as we scan left→right
+    last_strong: tuple[int, str] | None = None
+    last_weak: tuple[int, str] | None = None
 
-    if len(unique_strong_candidates) == 1:
+    for i, w in enumerate(stripped):
+        wl = w.lower()
+
+        # "final answer is X"
+        if (
+            i + 3 < len(stripped)
+            and wl == "final"
+            and stripped[i + 1].lower() == "answer"
+            and stripped[i + 2].lower() == "is"
+            and stripped[i + 3].upper() in valid_choices
+        ):
+            last_strong = (i, stripped[i + 3].upper())
+
+        # "answer is X" / "choice is X" / "option is X"
+        if (
+            i + 2 < len(stripped)
+            and wl in cue_words
+            and stripped[i + 1].lower() == "is"
+            and stripped[i + 2].upper() in valid_choices
+        ):
+            last_strong = (i, stripped[i + 2].upper())
+
+        # "final answer X"
+        if (
+            i + 2 < len(stripped)
+            and wl == "final"
+            and stripped[i + 1].lower() == "answer"
+            and stripped[i + 2].upper() in valid_choices
+        ):
+            last_strong = (i, stripped[i + 2].upper())
+
+        # "answer X" / "choice X" / "option X"
+        if (
+            i + 1 < len(stripped)
+            and wl in cue_words
+            and stripped[i + 1].upper() in valid_choices
+        ):
+            last_strong = (i, stripped[i + 1].upper())
+
+        # "therefore X" / "thus X"
+        if (
+            i + 1 < len(stripped)
+            and wl in concluding_words
+            and stripped[i + 1].upper() in valid_choices
+        ):
+            last_strong = (i, stripped[i + 1].upper())
+
+        # weak: any standalone valid letter
+        if w.upper() in valid_choices:
+            last_weak = (i, w.upper())
+
+    if last_strong is not None:
         return ParseResult(
-            final_choice=next(iter(unique_strong_candidates)),
+            final_choice=last_strong[1],
             status=PARSE_OK,
             raw_text=None,
             normalized_text=normalized_text,
-            reason="Answer successfully parsed from strong cue pattern"
+            reason="Answer successfully parsed from strong cue pattern",
         )
-    elif len(unique_strong_candidates) > 1:
+    if last_weak is not None:
         return ParseResult(
-            final_choice=None,
-            status=PARSE_AMBIGUOUS,
+            final_choice=last_weak[1],
+            status=PARSE_OK,
             raw_text=None,
             normalized_text=normalized_text,
-            reason="Multiple conflicting strong answer candidates found"
+            reason="Answer successfully parsed from last standalone letter",
         )
-    else:
-        if len(unique_weak_candidates) == 1:
-            return ParseResult(
-                final_choice=next(iter(unique_weak_candidates)),
-                status=PARSE_OK,
-                raw_text=None,
-                normalized_text=normalized_text,
-                reason="Answer successfully parsed from standalone candidate"
-            )
-        elif len(unique_weak_candidates) > 1:
-            return ParseResult(
-                final_choice=None,
-                status=PARSE_AMBIGUOUS,
-                raw_text=None,
-                normalized_text=normalized_text,
-                reason="Multiple conflicting standalone answer candidates found"
-            )
-        else:
-            return ParseResult(
-                final_choice=None,
-                status=PARSE_MISSING,
-                raw_text=None,
-                normalized_text=normalized_text,
-                reason="No direct answer letter found"
-            )
+    return ParseResult(
+        final_choice=None,
+        status=PARSE_MISSING,
+        raw_text=None,
+        normalized_text=normalized_text,
+        reason="No direct answer letter found",
+    )
 
 
 def extract_choice_text_match(

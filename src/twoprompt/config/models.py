@@ -12,6 +12,7 @@ load_dotenv()
 GEMINI_API_KEY = os.getenv("GEMINI_API_KEY")
 OPENAI_API_KEY = os.getenv("OPENAI_API_KEY")
 GROQ_API_KEY = os.getenv("GROQ_API_KEY")
+TOGETHER_API_KEY = os.getenv("TOGETHER_API_KEY")
 
 def validate_api_keys():
     if GEMINI_API_KEY is None:
@@ -20,6 +21,8 @@ def validate_api_keys():
         print("OpenAI API key missing")
     if GROQ_API_KEY is None:
         print("Groq API key missing")
+    if TOGETHER_API_KEY is None:
+        print("Together AI API key missing")
 
 # Default request settings ----------------------------------------------
 SEED = 42
@@ -32,11 +35,13 @@ MAX_RETRIES = 3
 OPENAI_PROVIDER = "openai"
 GEMINI_PROVIDER = "gemini"
 GROQ_PROVIDER = "groq"
+TOGETHER_PROVIDER = "together"
 
 SUPPORTED_PROVIDERS = {
     OPENAI_PROVIDER,
     GEMINI_PROVIDER,
     GROQ_PROVIDER,
+    TOGETHER_PROVIDER,
 }
 
 # Core / cheaper models -------------------------------------------------
@@ -61,6 +66,13 @@ STRONG_MODELS = [
     GROQ_STRONG_MODEL,
 ]
 
+# Together / open-weights models ----------------------------------------
+TOGETHER_QWEN_MODEL = "Qwen/Qwen2.5-7B-Instruct-Turbo"
+
+TOGETHER_MODELS = [
+    TOGETHER_QWEN_MODEL,
+]
+
 # All supported models --------------------------------------------------
 SUPPORTED_MODELS_BY_PROVIDER = {
     OPENAI_PROVIDER: {
@@ -74,6 +86,9 @@ SUPPORTED_MODELS_BY_PROVIDER = {
     GROQ_PROVIDER: {
         GROQ_CORE_MODEL,
         GROQ_STRONG_MODEL,
+    },
+    TOGETHER_PROVIDER: {
+        TOGETHER_QWEN_MODEL,
     },
 }
 

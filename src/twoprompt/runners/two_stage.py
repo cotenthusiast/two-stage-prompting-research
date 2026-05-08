@@ -3,6 +3,7 @@
 from typing import Any
 
 from twoprompt.pipeline.prompt_builder import (
+    build_direct_mcq_prompt,
     build_free_text_prompt,
     build_option_matching_prompt,
 )
@@ -20,6 +21,10 @@ class TwoStageRunner(ExperimentRunner):
     The intermediate free-text response is preserved in the result
     row for downstream answer-matching evaluation.
     """
+
+    def __init__(self, *args, fallback_on_parse_failure: bool = False, **kwargs) -> None:
+        super().__init__(*args, **kwargs)
+        self._fallback_on_parse_failure = fallback_on_parse_failure
 
     async def run_one(self, question_row: Any, sample_index: int) -> dict:
         """Execute one question through the two-stage pipeline.
@@ -82,6 +87,35 @@ class TwoStageRunner(ExperimentRunner):
                 options=self._build_options(question_row),
             )
 
+        # Fallback: if matching was unparseable, re-issue the direct MCQ prompt.
+        # Goes through the normal client path — hits cache if baseline already ran,
+        # makes a live API call otherwise.
+        fallback_used = False
+        if (
+            self._fallback_on_parse_failure
+            and matching_response.is_success()
+            and (parsed_result is None or parsed_result.final_choice is None)
+        ):
+            fallback_prompt = build_direct_mcq_prompt(
+                template=self._prompts["direct_mcq"],
+                question=question_row["question_text"],
+                option_a=question_row["choice_a"],
+                option_b=question_row["choice_b"],
+                option_c=question_row["choice_c"],
+                option_d=question_row["choice_d"],
+            )
+            fallback_request = self._build_model_request(
+                question_row, fallback_prompt, sample_index
+            )
+            fallback_response = await self.client.generate(fallback_request)
+            if fallback_response.is_success():
+                parsed_result, score_result = self._parse_and_score(
+                    raw_text=fallback_response.raw_text,
+                    correct_option=question_row["correct_option"],
+                    options=self._build_options(question_row),
+                )
+                fallback_used = True
+
         result = self._build_result_row(
             question_row=question_row,
             prompt=matching_prompt,
@@ -95,5 +129,6 @@ class TwoStageRunner(ExperimentRunner):
         result["free_text_prompt"] = free_text_prompt
         result["free_text_response"] = free_text_answer
         result["free_text_latency"] = free_text_response.latency_seconds
+        result["fallback_used"] = fallback_used
 
         return result

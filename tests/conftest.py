@@ -289,7 +289,7 @@ def valid_metadata() -> RequestMetadata:
 def valid_request(valid_metadata: RequestMetadata) -> ModelRequest:
     return ModelRequest(
         provider="openai",
-        model_name="gpt-5-mini",
+        model_name="gpt-4.1-mini",
         payload="Question: What is 2 + 2?\nA. 3\nB. 4\nC. 5\nD. 6",
         metadata=valid_metadata,
     )
@@ -299,7 +299,7 @@ def valid_request(valid_metadata: RequestMetadata) -> ModelRequest:
 def successful_response(valid_metadata: RequestMetadata) -> ModelResponse:
     return ModelResponse(
         provider="openai",
-        model_name="gpt-5-mini",
+        model_name="gpt-4.1-mini",
         status=SUCCESS_STATUS,
         latency_seconds=0.25,
         metadata=valid_metadata,
@@ -319,7 +319,7 @@ def successful_response(valid_metadata: RequestMetadata) -> ModelResponse:
 def failed_response(valid_metadata: RequestMetadata) -> ModelResponse:
     return ModelResponse(
         provider="openai",
-        model_name="gpt-5-mini",
+        model_name="gpt-4.1-mini",
         status=FAILURE_STATUS,
         latency_seconds=0.40,
         metadata=valid_metadata,

@@ -79,13 +79,17 @@ class TestExtractChoiceLetter:
         assert result.final_choice == "B"
         assert result.status == PARSE_OK
 
-    def test_returns_ambiguous_for_conflicting_strong_candidates(self) -> None:
-        assert extract_choice_letter(
+    def test_last_strong_cue_wins_when_multiple_strong_candidates(self) -> None:
+        result = extract_choice_letter(
             "The final answer is B or maybe the answer is C"
-        ).status == PARSE_AMBIGUOUS
+        )
+        assert result.status == PARSE_OK
+        assert result.final_choice == "C"
 
-    def test_returns_ambiguous_for_conflicting_weak_candidates(self) -> None:
-        assert extract_choice_letter("A or C or B").status == PARSE_AMBIGUOUS
+    def test_last_weak_candidate_wins_when_multiple_weak_candidates(self) -> None:
+        result = extract_choice_letter("A or C or B")
+        assert result.status == PARSE_OK
+        assert result.final_choice == "B"
 
     def test_prefers_strong_candidate_over_weak_mentions(self) -> None:
         result = extract_choice_letter("The final answer is B, not A or C")

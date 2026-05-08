@@ -24,18 +24,28 @@ def _cache_key(request: ModelRequest) -> str:
     Only deterministic generation parameters are included — not trace
     metadata (question_id, run_id, etc.), which vary per request but
     don't affect the model output.
+
+    When request_logprobs=True the Together client sends an extra assistant
+    prefill message that changes the effective API call.  A discriminator
+    field is included in the key so that pre-prefill cache entries are never
+    served for post-prefill calls (and vice-versa).
     """
-    fingerprint = json.dumps(
-        {
-            "provider": request.provider,
-            "model_name": request.model_name,
-            "prompt": request.payload,
-            "temperature": request.temperature,
-            "max_tokens": request.max_tokens,
-            "seed": request.seed,
-        },
-        sort_keys=True,
-    )
+    use_logprobs = getattr(request, "request_logprobs", False)
+    key_data: dict = {
+        "provider": request.provider,
+        "model_name": request.model_name,
+        "prompt": request.payload,
+        "temperature": request.temperature,
+        "max_tokens": request.max_tokens,
+        "seed": request.seed,
+        "request_logprobs": use_logprobs,
+    }
+    if use_logprobs and request.provider == "together":
+        # Bumped when the Together logprob strategy changes (e.g. adding a
+        # prefill message) so stale entries from a different strategy are
+        # never returned.
+        key_data["together_logprob_strategy"] = "v2_prefill"
+    fingerprint = json.dumps(key_data, sort_keys=True)
     return hashlib.sha256(fingerprint.encode()).hexdigest()
 
 
@@ -131,11 +141,13 @@ class CachingClientWrapper:
                 "completion_tokens": response.usage.completion_tokens,
                 "total_tokens": response.usage.total_tokens,
             }
-        return {
+        payload: dict[str, object] = {
             "raw_text": response.raw_text,
             "finish_reason": response.finish_reason,
             "usage": usage,
+            "logprobs": response.logprobs,
         }
+        return payload
 
     @staticmethod
     def _build_cached_response(
@@ -160,4 +172,5 @@ class CachingClientWrapper:
             usage=usage,
             error=None,
             timestamp_utc=None,
+            logprobs=payload.get("logprobs"),
         )

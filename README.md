@@ -14,7 +14,7 @@ The motivating intuition is straightforward: if option labels distort model beha
 
 ## Experiment Design
 
-Five conditions are compared across 1,000 stratified questions per benchmark:
+Four conditions are compared across 1,000 stratified questions per benchmark:
 
 | Condition | Description |
 |---|---|

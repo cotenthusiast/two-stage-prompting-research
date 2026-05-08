@@ -36,11 +36,10 @@ runs/*
 !runs/.gitkeep
 
 # Checkpoints
-checkpoints/*
-!checkpoints/.gitkeep
+checkpoints/
 
-# Report outputs (run directories are ignored; only committed structure is kept)
-reports/20*/
+# Report outputs
+reports/
 
 # Logs
 logs/*

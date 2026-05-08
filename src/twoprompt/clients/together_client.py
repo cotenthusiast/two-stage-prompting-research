@@ -17,7 +17,7 @@ from twoprompt.clients.types import (
 )
 
 _TOGETHER_BASE_URL = "https://api.together.xyz/v1"
-_TOP_LOGPROBS = 20
+_TOP_LOGPROBS = 5
 # Assistant prefill injected when request_logprobs=True.  By continuing from
 # this prefix the model's first generated token is almost always a bare letter
 # (A/B/C/D), so letter logprobs appear in top_logprobs at position 0.

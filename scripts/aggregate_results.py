@@ -4,34 +4,41 @@ import argparse
 from pathlib import Path
 
 import pandas as pd
+import yaml
 
 from twoprompt.config.experiment import BASELINE_METHOD
 from twoprompt.config.paths import REPORTS_DIR
+
+_ROOT = Path(__file__).resolve().parents[1]
 
 METHOD_ORDER = [
     "baseline",
     "two_prompt",
     "cyclic",
-    "two_prompt_cyclic",
+    "pride",
 ]
 
 MODEL_ORDER = [
     "gpt-4.1-mini",
     "gemini-2.5-flash",
     "llama-3.1-8b-instant",
+    "Qwen/Qwen2.5-7B-Instruct",
+    "Qwen/Qwen2.5-7B-Instruct-Turbo",
 ]
 
 MODEL_DISPLAY = {
     "gpt-4.1-mini": "GPT-4.1-mini",
     "gemini-2.5-flash": "Gemini-2.5-Flash",
     "llama-3.1-8b-instant": "Llama-3.1-8B",
+    "Qwen/Qwen2.5-7B-Instruct": "Qwen 2.5 7B",
+    "Qwen/Qwen2.5-7B-Instruct-Turbo": "Qwen 2.5 7B Turbo",
 }
 
 METHOD_DISPLAY = {
     "baseline": "Baseline",
     "two_prompt": "Two-Stage",
     "cyclic": "Cyclic Perm.",
-    "two_prompt_cyclic": "Two-Stage + Cyclic",
+    "pride": "PriDe",
 }
 
 
@@ -402,9 +409,28 @@ def build_latex_failure_table(accuracy: pd.DataFrame) -> str:
 def main() -> None:
     parser = argparse.ArgumentParser(description="Aggregate evaluation reports for paper.")
     parser.add_argument("run_id", help="Run ID (folder name under reports/)")
+    parser.add_argument(
+        "--config",
+        type=Path,
+        default=None,
+        help="Path to YAML config (default: use built-in path constants)",
+    )
+    parser.add_argument(
+        "--benchmark",
+        default=None,
+        help="Benchmark sub-folder within the run report dir (e.g. mmlu, arc_challenge)",
+    )
     args = parser.parse_args()
 
-    report_dir = REPORTS_DIR / args.run_id
+    if args.config is not None:
+        cfg = yaml.safe_load(args.config.read_text())
+        reports_dir = _ROOT / cfg["paths"]["reports_dir"]
+    else:
+        reports_dir = REPORTS_DIR
+
+    report_dir = reports_dir / args.run_id
+    if args.benchmark:
+        report_dir = report_dir / args.benchmark
     output_dir = report_dir / "paper"
     output_dir.mkdir(parents=True, exist_ok=True)
 

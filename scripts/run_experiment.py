@@ -16,6 +16,7 @@ from __future__ import annotations
 import argparse
 import asyncio
 import logging
+import shutil
 import sys
 from datetime import datetime, timezone
 from pathlib import Path
@@ -25,12 +26,14 @@ import yaml
 from twoprompt.clients.gemini_client import GeminiClient
 from twoprompt.clients.groq_client import GroqClient
 from twoprompt.clients.openai_client import OpenAIClient
+from twoprompt.clients.together_client import TogetherAIClient
 from twoprompt.infra.cache import CachingClientWrapper, ResponseCache
 from twoprompt.infra.checkpoint import CheckpointManager
 from twoprompt.io.readers import read_normalized_questions, read_split_ids
 from twoprompt.io.writers import write_run_results
 from twoprompt.runners.direct_mcq import DirectMCQRunner
 from twoprompt.runners.permutation import PermutationRunner
+from twoprompt.runners.pride import PriDeRunner
 from twoprompt.runners.two_stage import TwoStageRunner
 from twoprompt.runners.two_stage_permutation import TwoStagePermutationRunner
 
@@ -51,25 +54,37 @@ _METHOD_TO_RUNNER = {
     "baseline": DirectMCQRunner,
     "two_prompt": TwoStageRunner,
     "cyclic": PermutationRunner,
-    "two_prompt_cyclic": TwoStagePermutationRunner,
+    "pride": PriDeRunner,
 }
 
 # API calls per question for each method (used for preflight estimates).
+# ``pride`` is handled specially in ``preflight_estimate`` (calibration + inference).
 _CALLS_PER_QUESTION = {
     "baseline": 1,
     "two_prompt": 2,       # stage 1 free-text + stage 2 matching
     "cyclic": 4,           # 4 cyclic permutations
-    "two_prompt_cyclic": 5,  # 1 free-text + 4 permuted matching calls
+    "pride": 1,
 }
 
 # Approximate avg tokens per API call (very rough; for cost estimates only).
 _AVG_INPUT_TOKENS = 200
 _AVG_OUTPUT_TOKENS = 15
 
-# Maps split name to the artifact_group subdirectory used by read_split_ids.
-_SPLIT_TO_ARTIFACT_GROUP = {
-    "robustness": "benchmark",
-    "review": "faithfulness",
+# Maps (benchmark, split) to the artifact_group subdirectory used by read_split_ids.
+_BENCHMARK_ARTIFACT_GROUP = {
+    "mmlu": {
+        "robustness": "benchmark",
+        "review": "faithfulness",
+    },
+    "arc_challenge": {
+        "robustness": "arc_challenge",
+    },
+}
+
+# Maps benchmark name to its normalized CSV filename under data_processed_dir.
+_BENCHMARK_NORMALIZED_FILE = {
+    "mmlu": "mmlu_normalized.csv",
+    "arc_challenge": "arc_challenge_normalized.csv",
 }
 
 
@@ -90,25 +105,69 @@ def resolve_paths(paths_cfg: dict) -> dict[str, Path]:
 # Data loading
 # ---------------------------------------------------------------------------
 
+def _resolve_artifact_group(benchmark: str, split: str) -> str:
+    """Return the artifact_group subdirectory for a given benchmark/split pair."""
+    benchmark_splits = _BENCHMARK_ARTIFACT_GROUP.get(benchmark)
+    if benchmark_splits is None:
+        raise ValueError(f"Unknown benchmark: {benchmark!r}")
+    group = benchmark_splits.get(split)
+    if group is None:
+        raise ValueError(f"Unknown split {split!r} for benchmark {benchmark!r}")
+    return group
+
+
 def load_questions(benchmark: str, split: str, paths: dict[str, Path]) -> list[dict]:
     """Load normalized questions for a given benchmark and split."""
-    if benchmark == "mmlu":
-        df = read_normalized_questions(
-            "mmlu_normalized.csv", paths["data_processed_dir"]
+    if benchmark not in _BENCHMARK_NORMALIZED_FILE:
+        raise ValueError(f"Unknown benchmark: {benchmark!r}")
+
+    normalized_file = _BENCHMARK_NORMALIZED_FILE[benchmark]
+    artifact_group = _resolve_artifact_group(benchmark, split)
+
+    df = read_normalized_questions(normalized_file, paths["data_processed_dir"])
+    split_ids = read_split_ids(split, paths["data_splits_dir"], artifact_group)
+    df = df[df["question_id"].isin(split_ids)].drop_duplicates(subset="question_id")
+    return df.to_dict(orient="records")
+
+
+def load_calibration_questions(
+    benchmark: str,
+    eval_question_ids: set[str],
+    paths: dict[str, Path],
+) -> list[dict]:
+    """Return questions from the full normalized CSV that are NOT in the eval split.
+
+    Used by PriDeRunner so the position prior is estimated on questions the
+    runner will never be scored on, eliminating calibration/eval overlap.
+    """
+    if benchmark not in _BENCHMARK_NORMALIZED_FILE:
+        logger.warning(
+            "Unknown benchmark %r — returning empty PriDe calibration pool", benchmark
         )
-        artifact_group = _SPLIT_TO_ARTIFACT_GROUP.get(split, split)
-        split_ids = read_split_ids(split, paths["data_splits_dir"], artifact_group)
-        df = df[df["question_id"].isin(split_ids)].drop_duplicates(subset="question_id")
-        return df.to_dict(orient="records")
-    raise ValueError(f"Unknown benchmark: {benchmark!r}")
+        return []
+    normalized_file = _BENCHMARK_NORMALIZED_FILE[benchmark]
+    try:
+        df = read_normalized_questions(normalized_file, paths["data_processed_dir"])
+    except FileNotFoundError as exc:
+        logger.warning("Cannot load PriDe calibration questions: %s", exc)
+        return []
+    df = df[~df["question_id"].isin(eval_question_ids)].drop_duplicates(
+        subset="question_id"
+    )
+    candidates = df.to_dict(orient="records")
+    logger.info(
+        "PriDe calibration pool for %s: %d questions (%d eval excluded)",
+        benchmark,
+        len(candidates),
+        len(eval_question_ids),
+    )
+    return candidates
 
 
 def count_split_questions(benchmark: str, split: str, paths: dict[str, Path]) -> int:
     """Return question count without loading the full DataFrame."""
-    if benchmark == "mmlu":
-        artifact_group = _SPLIT_TO_ARTIFACT_GROUP.get(split, split)
-        return len(read_split_ids(split, paths["data_splits_dir"], artifact_group))
-    raise ValueError(f"Unknown benchmark: {benchmark!r}")
+    artifact_group = _resolve_artifact_group(benchmark, split)
+    return len(read_split_ids(split, paths["data_splits_dir"], artifact_group))
 
 
 # ---------------------------------------------------------------------------
@@ -131,6 +190,8 @@ def build_client(model_name: str, model_cfg: dict):
         return GeminiClient(**kwargs)
     if provider == "groq":
         return GroqClient(**kwargs)
+    if provider == "together":
+        return TogetherAIClient(**kwargs)
     raise ValueError(f"Unknown provider: {provider!r} for model {model_name!r}")
 
 
@@ -167,9 +228,17 @@ def preflight_estimate(config: dict, paths: dict[str, Path]) -> None:
         input_price = pricing.get("input_per_1m", 0.0)
         output_price = pricing.get("output_per_1m", 0.0)
 
-        job_calls = sum(
-            _CALLS_PER_QUESTION.get(m, 1) * n_questions for m in methods
-        )
+        job_calls = 0
+        calib_n = int(run_cfg.get("pride_calibration_n", 50))
+        max_calib_effect = min(calib_n, n_questions)
+        for m in methods:
+            if m == "pride":
+                # N eval items: 1 direct call each.
+                # K calibration items (separate pool): 4 cyclic calls each.
+                calib_k = int(run_cfg.get("pride_calibration_n", 50))
+                job_calls += n_questions + 4 * calib_k
+            else:
+                job_calls += _CALLS_PER_QUESTION.get(m, 1) * n_questions
         job_cost = job_calls * (
             (_AVG_INPUT_TOKENS * input_price + _AVG_OUTPUT_TOKENS * output_price) / 1_000_000
         )
@@ -220,7 +289,7 @@ async def run_single_method(
     Returns a summary dict with counts for the final log.
     """
     runner_cls = _METHOD_TO_RUNNER[method]
-    runner = runner_cls(
+    common_kw = dict(
         client=client,
         method_name=method,
         split_name=split,
@@ -231,6 +300,24 @@ async def run_single_method(
         max_tokens=run_cfg.get("max_tokens", 500),
         seed=run_cfg.get("seed", 42),
     )
+    if method == "pride":
+        eval_ids = {q["question_id"] for q in questions}
+        calib_candidates = load_calibration_questions(benchmark, eval_ids, paths)
+        runner = runner_cls(
+            **common_kw,
+            calibration_n=int(run_cfg.get("pride_calibration_n", 50)),
+            calibration_seed=int(run_cfg.get("pride_calibration_seed", 42)),
+            calibration_benchmark=benchmark,
+            calibration_runs_dir=paths["runs_dir"],
+            calibration_questions=calib_candidates,
+        )
+    elif method == "two_prompt":
+        runner = runner_cls(
+            **common_kw,
+            fallback_on_parse_failure=run_cfg.get("fallback_on_parse_failure", False),
+        )
+    else:
+        runner = runner_cls(**common_kw)
 
     checkpoint_mgr = CheckpointManager(
         checkpoint_dir=paths["checkpoints_dir"],
@@ -246,6 +333,9 @@ async def run_single_method(
     started_at: str = (
         state["started_at"] if state else datetime.now(timezone.utc).isoformat()
     )
+    # Backfill benchmark field for rows restored from an older checkpoint.
+    for row in accumulated:
+        row.setdefault("benchmark", benchmark)
 
     completed_set = set(completed_ids)
     remaining = [q for q in questions if q["question_id"] not in completed_set]
@@ -274,6 +364,8 @@ async def run_single_method(
                 failed += len(batch)
                 continue
 
+            for row in batch_results:
+                row["benchmark"] = benchmark
             accumulated.extend(batch_results)
             completed_ids.extend(r["question_id"] for r in batch_results)
             checkpoint_mgr.save(completed_ids, accumulated, started_at)
@@ -287,6 +379,7 @@ async def run_single_method(
         run_id=run_id,
         method_name=method,
         model_name=model_name,
+        benchmark=benchmark,
     )
     checkpoint_mgr.delete()
     logger.info("%s  done → %s", tag, output_path)
@@ -423,6 +516,17 @@ async def main() -> None:
     logger.info("Run ID: %s", run_id)
     logger.info("Cache: %s", "enabled" if use_cache else "disabled")
     logger.info("Config: %s", args.config)
+
+    # Snapshot config and prompt templates into the run directory.
+    run_dir = paths["runs_dir"] / run_id
+    run_dir.mkdir(parents=True, exist_ok=True)
+    shutil.copy2(args.config, run_dir / "config.yaml")
+    prompt_version = run_cfg.get("prompt_version", "v1")
+    prompt_src = paths["prompts_dir"] / prompt_version
+    prompt_dst = run_dir / "prompts" / prompt_version
+    if prompt_src.exists() and not prompt_dst.exists():
+        shutil.copytree(prompt_src, prompt_dst)
+    logger.info("Snapshotted config and prompts/%s → %s", prompt_version, run_dir)
 
     # Pre-load questions for each unique (benchmark, split) combination.
     questions_cache: dict[tuple, list[dict]] = {}

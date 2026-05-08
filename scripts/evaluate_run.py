@@ -6,9 +6,11 @@ from pathlib import Path
 
 import numpy as np
 import pandas as pd
+import yaml
 
 from twoprompt.config.experiment import (
     BASELINE_METHOD,
+    PRIDE_METHOD,
     TWOPROMPT_METHOD,
     TWOPROMPT_CYCLIC_METHOD,
 )
@@ -16,19 +18,23 @@ from twoprompt.config.paths import REPORTS_DIR, RUNS_DIR
 from twoprompt.parsing.parser import parse_model_answer
 from twoprompt.scoring.scorer import score_prediction
 
+_ROOT = Path(__file__).resolve().parents[1]
+
 OPTIONS = ["A", "B", "C", "D"]
 
 METHOD_ORDER = [
     "baseline",
     "two_prompt",
     "cyclic",
-    "two_prompt_cyclic",
+    "pride",
 ]
 
 MODEL_ORDER = [
     "gpt-4.1-mini",
     "gemini-2.5-flash",
     "llama-3.1-8b-instant",
+    "Qwen/Qwen2.5-7B-Instruct",
+    "Qwen/Qwen2.5-7B-Instruct-Turbo",
 ]
 
 N_BOOTSTRAP = 10_000
@@ -116,10 +122,14 @@ def reparse_run(df: pd.DataFrame) -> pd.DataFrame:
     raw_text is present.
     """
     df = df.copy()
+    # CSV loads can infer float64 for columns with NaNs; reparsing assigns bools.
+    if "is_correct" in df.columns:
+        df["is_correct"] = df["is_correct"].astype(object)
 
     reparsable_mask = (
         (df["model_status"].fillna("") != "failure")
         & (df["parse_reason"].fillna("") != "majority_vote")
+        & (df["method_name"] != PRIDE_METHOD)
     )
 
     parsed_choices = []
@@ -153,6 +163,59 @@ def reparse_run(df: pd.DataFrame) -> pd.DataFrame:
     df.loc[idx, "parse_reason"] = parse_reasons
     df.loc[idx, "is_correct"] = is_corrects
     df.loc[idx, "score_status"] = score_statuses
+
+    return df
+
+
+_FALLBACK_METHODS = {TWOPROMPT_METHOD, TWOPROMPT_CYCLIC_METHOD}
+
+
+def apply_baseline_fallback(df: pd.DataFrame) -> pd.DataFrame:
+    """For unscorable two_prompt / two_prompt_cyclic rows, substitute baseline results.
+
+    A row is eligible for fallback when:
+    - its method is two_prompt or two_prompt_cyclic
+    - model_status != "failure" (the API call succeeded)
+    - is_correct is NaN (parsing produced no scorable answer)
+
+    For each eligible row the corresponding baseline row for the same
+    (model_name, question_id) is looked up and its is_correct / parsed_choice /
+    parse_status values are copied in.  A boolean column ``fallback_applied``
+    is added to the DataFrame so downstream aggregations can count fallbacks.
+    """
+    df = df.copy()
+    df["fallback_applied"] = False
+
+    for model in df["model_name"].dropna().unique():
+        baseline_df = df[
+            (df["model_name"] == model) & (df["method_name"] == BASELINE_METHOD)
+        ]
+        if baseline_df.empty:
+            continue
+
+        baseline_idx = baseline_df.set_index("question_id")
+
+        for method in _FALLBACK_METHODS:
+            eligible_mask = (
+                (df["model_name"] == model)
+                & (df["method_name"] == method)
+                & (df["model_status"].fillna("") != "failure")
+                & (df["is_correct"].isna())
+            )
+            eligible_qids = df.loc[eligible_mask, "question_id"]
+            available_qids = eligible_qids[eligible_qids.isin(baseline_idx.index)]
+
+            if available_qids.empty:
+                continue
+
+            for qid in available_qids:
+                bl = baseline_idx.loc[qid]
+                row_mask = eligible_mask & (df["question_id"] == qid)
+                df.loc[row_mask, "is_correct"] = bl["is_correct"]
+                df.loc[row_mask, "parsed_choice"] = bl["parsed_choice"]
+                if "parse_status" in df.columns and "parse_status" in baseline_idx.columns:
+                    df.loc[row_mask, "parse_status"] = bl["parse_status"]
+                df.loc[row_mask, "fallback_applied"] = True
 
     return df
 
@@ -201,6 +264,15 @@ def validate_run(df: pd.DataFrame, run_dir: Path) -> None:
     print(f"[validate] Methods found: {sorted(found_methods)}")
     print(f"[validate] Models found: {sorted(found_models)}")
 
+    if "benchmark" in df.columns:
+        benchmarks = sorted(df["benchmark"].dropna().unique())
+        print(f"[validate] Benchmarks found: {benchmarks}")
+        if len(benchmarks) > 1:
+            errors.append(
+                f"Multiple benchmarks in one evaluation: {benchmarks}. "
+                "Re-run with --benchmark to filter to one benchmark at a time."
+            )
+
     counts = (
         df.groupby(["method_name", "model_name"])
         .size()
@@ -215,6 +287,8 @@ def validate_run(df: pd.DataFrame, run_dir: Path) -> None:
             print("[validate] WARNING: present conditions do not all have the same row count.")
 
     for method in METHOD_ORDER:
+        if method not in found_methods:
+            continue  # method completely absent from this run — not an error
         for model in MODEL_ORDER:
             subset = df[(df["method_name"] == method) & (df["model_name"] == model)]
             if subset.empty:
@@ -279,6 +353,17 @@ def compute_accuracy(df: pd.DataFrame) -> pd.DataFrame:
             else:
                 cond_ci_lo, cond_ci_hi = float("nan"), float("nan")
 
+            fallback_count = (
+                int(group["fallback_applied"].eq(True).sum())
+                if "fallback_applied" in group.columns
+                else 0
+            )
+            runtime_fallback_count = (
+                int(group["fallback_used"].eq(True).sum())
+                if "fallback_used" in group.columns
+                else 0
+            )
+
             rows.append(
                 {
                     "method": method,
@@ -292,6 +377,8 @@ def compute_accuracy(df: pd.DataFrame) -> pd.DataFrame:
                     "scored": scored,
                     "correct": correct,
                     "final_unscorable": final_unscorable,
+                    "fallback_count": fallback_count,
+                    "runtime_fallback_count": runtime_fallback_count,
                     "end_to_end_accuracy": correct / total if total > 0 else 0.0,
                     "end_to_end_accuracy_ci_lower": e2e_ci_lo,
                     "end_to_end_accuracy_ci_upper": e2e_ci_hi,
@@ -551,6 +638,12 @@ def compute_two_stage_metrics(df: pd.DataFrame) -> pd.DataFrame:
                 ft_latencies = group["free_text_latency"].dropna()
                 mean_ft_latency = ft_latencies.mean() if len(ft_latencies) > 0 else None
 
+            runtime_fallbacks = (
+                int(group["fallback_used"].eq(True).sum())
+                if "fallback_used" in group.columns
+                else 0
+            )
+
             rows.append(
                 {
                     "method": method,
@@ -559,6 +652,8 @@ def compute_two_stage_metrics(df: pd.DataFrame) -> pd.DataFrame:
                     "free_text_available": has_free_text,
                     "free_text_rate": has_free_text / total if total > 0 else 0.0,
                     "mean_free_text_latency": mean_ft_latency,
+                    "runtime_fallback_count": runtime_fallbacks,
+                    "runtime_fallback_rate": runtime_fallbacks / total if total > 0 else 0.0,
                 }
             )
 
@@ -575,18 +670,68 @@ def compute_two_stage_metrics(df: pd.DataFrame) -> pd.DataFrame:
 def main() -> None:
     parser = argparse.ArgumentParser(description="Evaluate one experiment run.")
     parser.add_argument("run_id", help="Run ID (folder name under runs/)")
+    parser.add_argument(
+        "--config",
+        type=Path,
+        default=None,
+        help="Path to YAML config (default: use built-in path constants)",
+    )
+    parser.add_argument(
+        "--benchmark",
+        default=None,
+        help="Filter to a single benchmark (e.g. mmlu, arc_challenge). "
+             "Required when a run contains multiple benchmarks.",
+    )
+    parser.add_argument(
+        "--apply-fallback",
+        action="store_true",
+        default=False,
+        help=(
+            "For two_prompt / two_prompt_cyclic rows that are still unscorable after "
+            "reparsing, substitute the baseline result for that question_id. "
+            "Adds a fallback_count column to accuracy.csv."
+        ),
+    )
     args = parser.parse_args()
 
-    run_dir = RUNS_DIR / args.run_id
-    report_dir = REPORTS_DIR / args.run_id
+    if args.config is not None:
+        cfg = yaml.safe_load(args.config.read_text())
+        runs_dir = _ROOT / cfg["paths"]["runs_dir"]
+        reports_dir = _ROOT / cfg["paths"]["reports_dir"]
+    else:
+        runs_dir = RUNS_DIR
+        reports_dir = REPORTS_DIR
+
+    run_dir = runs_dir / args.run_id
+    report_dir = reports_dir / args.run_id
+    _BENCHMARK_ALIASES = {"arc": "arc_challenge"}
+    if args.benchmark:
+        args.benchmark = _BENCHMARK_ALIASES.get(args.benchmark, args.benchmark)
+        report_dir = report_dir / args.benchmark
     report_dir.mkdir(parents=True, exist_ok=True)
 
     print(f"[eval] Loading run {args.run_id}...")
     df = load_run(run_dir)
     print(f"[eval] {len(df)} total rows loaded")
 
+    if args.benchmark:
+        if "benchmark" in df.columns:
+            df = df[df["benchmark"] == args.benchmark].reset_index(drop=True)
+            print(f"[eval] Filtered to benchmark={args.benchmark!r}: {len(df)} rows")
+        else:
+            print(
+                f"[eval] WARNING: no 'benchmark' column in data; "
+                "--benchmark filter has no effect (older run format)"
+            )
+
     print("[eval] Re-parsing responses with current parser...")
     df = reparse_run(df)
+
+    if args.apply_fallback:
+        print("[eval] Applying baseline fallback for unscorable two-stage rows...")
+        df = apply_baseline_fallback(df)
+        n_fallbacks = int(df["fallback_applied"].eq(True).sum())
+        print(f"[eval]   {n_fallbacks} rows substituted from baseline")
 
     print("\n[eval] Validating run data...")
     validate_run(df, run_dir)
@@ -594,26 +739,25 @@ def main() -> None:
     print("\n[eval] Computing accuracy...")
     accuracy = compute_accuracy(df)
     accuracy.to_csv(report_dir / "accuracy.csv", index=False)
-    print(
-        accuracy[
-            [
-                "method",
-                "model",
-                "total",
-                "correct",
-                "scored",
-                "final_unscorable",
-                "end_to_end_accuracy",
-                "end_to_end_accuracy_ci_lower",
-                "end_to_end_accuracy_ci_upper",
-                "conditional_accuracy",
-                "conditional_accuracy_ci_lower",
-                "conditional_accuracy_ci_upper",
-                "api_failures",
-                "parse_failures",
-            ]
-        ].to_string(index=False)
-    )
+    accuracy_display_cols = [
+        "method",
+        "model",
+        "total",
+        "correct",
+        "scored",
+        "final_unscorable",
+        "fallback_count",
+        "runtime_fallback_count",
+        "end_to_end_accuracy",
+        "end_to_end_accuracy_ci_lower",
+        "end_to_end_accuracy_ci_upper",
+        "conditional_accuracy",
+        "conditional_accuracy_ci_lower",
+        "conditional_accuracy_ci_upper",
+        "api_failures",
+        "parse_failures",
+    ]
+    print(accuracy[accuracy_display_cols].to_string(index=False))
 
     print("\n[eval] Computing positional bias...")
     bias = compute_positional_bias(df)

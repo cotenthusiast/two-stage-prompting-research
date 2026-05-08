@@ -49,6 +49,16 @@ models:
       input_per_1m: 0.0
       output_per_1m: 0.0
 
+  Qwen/Qwen2.5-7B-Instruct-Turbo:
+    provider: together
+    concurrency: 5
+    min_delay_seconds: 0.2
+    max_retries: 3
+    timeout: 60
+    pricing:
+      input_per_1m: 0.20
+      output_per_1m: 0.20
+
 # ---------------------------------------------------------------------------
 # Run settings
 # ---------------------------------------------------------------------------
@@ -65,7 +75,10 @@ run:
   # return the cached response without hitting the API. Disable with --no-cache.
   cache_enabled: true
 
-  # Revision 5 hook — not yet implemented.
+  # PriDe (Together + logprobs). Add `pride` to methods on Qwen jobs only.
+  pride_calibration_n: 50
+  pride_calibration_seed: 42
+
   fallback_on_parse_failure: false
 
   # Job matrix: each entry is one (model × methods × benchmark × split) run.
@@ -73,18 +86,39 @@ run:
   # definition under `models` above.
   jobs:
     - model: gpt-4.1-mini
-      methods: [baseline, two_prompt, cyclic, two_prompt_cyclic]
+      methods: [baseline, two_prompt, cyclic]
       benchmark: mmlu
       split: robustness
     - model: gemini-2.5-flash
-      methods: [baseline, two_prompt, cyclic, two_prompt_cyclic]
+      methods: [baseline, two_prompt, cyclic]
       benchmark: mmlu
       split: robustness
     - model: llama-3.1-8b-instant
-      methods: [baseline, two_prompt, cyclic, two_prompt_cyclic]
+      methods: [baseline, two_prompt, cyclic]
       benchmark: mmlu
       split: robustness
-# --------------------- ------------------------------------------------------
+    - model: Qwen/Qwen2.5-7B-Instruct-Turbo
+      methods: [baseline, two_prompt, cyclic, pride]
+      benchmark: mmlu
+      split: robustness
+    # ARC-Challenge jobs (all models)
+    - model: gpt-4.1-mini
+      methods: [baseline, two_prompt, cyclic]
+      benchmark: arc_challenge
+      split: robustness
+    - model: gemini-2.5-flash
+      methods: [baseline, two_prompt, cyclic]
+      benchmark: arc_challenge
+      split: robustness
+    - model: llama-3.1-8b-instant
+      methods: [baseline, two_prompt, cyclic]
+      benchmark: arc_challenge
+      split: robustness
+    - model: Qwen/Qwen2.5-7B-Instruct-Turbo
+      methods: [baseline, two_prompt, cyclic, pride]
+      benchmark: arc_challenge
+      split: robustness
+# ---------------------------------------------------------------------------
 # Paths (relative to repo root)
 # ---------------------------------------------------------------------------
 paths:

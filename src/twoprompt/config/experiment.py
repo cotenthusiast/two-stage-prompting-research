@@ -9,12 +9,13 @@ BASELINE_METHOD = "baseline"
 TWOPROMPT_METHOD = "two_prompt"
 CYCLIC_METHOD = "cyclic"
 TWOPROMPT_CYCLIC_METHOD = "two_prompt_cyclic"
+PRIDE_METHOD = "pride"
 
 ALL_METHODS = [
     BASELINE_METHOD,
     TWOPROMPT_METHOD,
     CYCLIC_METHOD,
-    TWOPROMPT_CYCLIC_METHOD,
+    PRIDE_METHOD,
 ]
 
 # Track A: robustness / accuracy ------------------------
@@ -83,7 +84,6 @@ ROBUSTNESS_METHODS = [
     BASELINE_METHOD,
     TWOPROMPT_METHOD,
     CYCLIC_METHOD,
-    TWOPROMPT_CYCLIC_METHOD,
 ]
 
 ROBUSTNESS_SPLIT_SEED = 42
@@ -126,7 +126,6 @@ REVIEW_METHODS = [
     BASELINE_METHOD,
     TWOPROMPT_METHOD,
     CYCLIC_METHOD,
-    TWOPROMPT_CYCLIC_METHOD,
 ]
 
 # Track B: stronger models ------------------------------

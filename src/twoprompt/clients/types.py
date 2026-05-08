@@ -162,6 +162,7 @@ class ModelRequest:
         temperature: float = TEMPERATURE,
         max_tokens: int = MAX_TOKENS,
         seed: int | None = SEED,
+        request_logprobs: bool = False,
     ) -> None:
         self.provider = provider
         self.model_name = model_name
@@ -170,6 +171,7 @@ class ModelRequest:
         self.temperature = temperature
         self.max_tokens = max_tokens
         self.seed = seed
+        self.request_logprobs = request_logprobs
 
     def validate(self) -> None:
         """Validate that the request contains supported values and metadata."""
@@ -232,6 +234,7 @@ class ModelResponse:
         usage: UsageInfo | None = None,
         error: ErrorInfo | None = None,
         timestamp_utc: str | None = None,
+        logprobs: list | None = None,
     ) -> None:
         self.provider = provider
         self.model_name = model_name
@@ -243,6 +246,7 @@ class ModelResponse:
         self.usage = usage
         self.error = error
         self.timestamp_utc = timestamp_utc
+        self.logprobs = logprobs
 
     def validate(self) -> None:
         """Validate that the response contains supported values and metadata."""

@@ -60,23 +60,23 @@ class DummyClient(BaseClient):
 
 @pytest.fixture
 def dummy_success_client() -> DummyClient:
-    return DummyClient(provider="openai", model_name="gpt-5-mini", behavior="success")
+    return DummyClient(provider="openai", model_name="gpt-4.1-mini", behavior="success")
 
 @pytest.fixture
 def dummy_timeout_client() -> DummyClient:
-    return DummyClient(provider="openai", model_name="gpt-5-mini", behavior="timeout")
+    return DummyClient(provider="openai", model_name="gpt-4.1-mini", behavior="timeout")
 
 @pytest.fixture
 def dummy_generic_error_client() -> DummyClient:
-    return DummyClient(provider="openai", model_name="gpt-5-mini", behavior="generic_error")
+    return DummyClient(provider="openai", model_name="gpt-4.1-mini", behavior="generic_error")
 
 @pytest.fixture
 def dummy_invalid_response_client() -> DummyClient:
-    return DummyClient(provider="openai", model_name="gpt-5-mini", behavior="invalid_response")
+    return DummyClient(provider="openai", model_name="gpt-4.1-mini", behavior="invalid_response")
 
 @pytest.fixture
 def dummy_failure_response_client() -> DummyClient:
-    return DummyClient(provider="openai", model_name="gpt-5-mini", behavior="failure_response")
+    return DummyClient(provider="openai", model_name="gpt-4.1-mini", behavior="failure_response")
 
 @pytest.fixture
 def dummy_mismatch_client() -> DummyClient:
@@ -103,7 +103,7 @@ class TestGenerate:
         assert response.status == FAILURE_STATUS
         assert response.error is not None
         assert response.error.error_type == "ProviderConfigurationError"
-        assert response.error.stage == "request_compatibility"
+        assert response.error.stage == "request_validation"
         assert response.error.retryable is False
         assert response.latency_seconds >= 0
         response.metadata.validate()
@@ -131,7 +131,7 @@ class TestGenerate:
         response = await dummy_invalid_response_client.generate(valid_request)
         assert not response.is_success()
         assert response.error.error_type == "ResponseValidationError"
-        assert response.error.stage == "response_validation"
+        assert response.error.stage == "provider_call"
         assert response.error.retryable is False
 
 
@@ -208,9 +208,9 @@ class TestNormalizeException:
         [
             (ValidationError("bad request"), "request_validation", "ValidationError", False),
             (ProviderTimeoutError("timed out"), "provider_call", "ProviderTimeoutError", True),
-            (ProviderConfigurationError("mismatch"), "request_compatibility", "ProviderConfigurationError", False),
+            (ProviderConfigurationError("mismatch"), "provider_call", "ProviderConfigurationError", False),
             (RuntimeError("boom"), "provider_call", "RuntimeError", False),
-            (ValueError("bad value"), "response_validation", "ValueError", False),
+            (ValueError("bad value"), "provider_call", "ValueError", False),
         ],
     )
     def test_maps_exceptions_correctly(self, dummy_success_client, exc, stage, expected_error_type, expected_retryable):

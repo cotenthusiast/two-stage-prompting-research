@@ -1,8 +1,15 @@
 # tests/runners/test_permutation.py
 
+from pathlib import Path
+
 import pytest
 
 from twoprompt.runners.permutation import PermutationRunner
+from twoprompt.pipeline.prompt_builder import load_prompt_templates
+
+REPO_ROOT = Path(__file__).resolve().parents[2]
+_PROMPTS_DIR = REPO_ROOT / "prompts"
+_TEMPLATES = load_prompt_templates("v1", _PROMPTS_DIR)
 from twoprompt.clients.types import ModelResponse, RequestMetadata
 from twoprompt.scoring.types import SCORE_CORRECT, SCORE_INCORRECT, SCORE_UNSCORABLE
 from twoprompt.parsing.types import PARSE_OK, PARSE_MISSING
@@ -57,7 +64,9 @@ class TestBuildPermutedPrompt:
     def test_prompt_contains_permuted_options(self, runner_question_row, canonical_options):
         """Prompt should include the permuted option texts."""
         perms = PermutationRunner._generate_permutations(canonical_options)
-        prompt = PermutationRunner._build_permuted_prompt(runner_question_row, perms[1])
+        prompt = PermutationRunner._build_permuted_prompt(
+            runner_question_row, perms[1], _TEMPLATES["direct_mcq"]
+        )
 
         assert runner_question_row["question_text"] in prompt
         # In permutation 1, A maps to HTTP (originally B)
@@ -65,7 +74,9 @@ class TestBuildPermutedPrompt:
 
     def test_prompt_contains_question(self, runner_question_row, canonical_options):
         """Prompt should include the question text."""
-        prompt = PermutationRunner._build_permuted_prompt(runner_question_row, canonical_options)
+        prompt = PermutationRunner._build_permuted_prompt(
+            runner_question_row, canonical_options, _TEMPLATES["direct_mcq"]
+        )
         assert "securely browse websites" in prompt
 
 
@@ -166,6 +177,7 @@ class TestPermutationRunnerRunOne:
             method_name="pride",
             split_name="robustness",
             prompt_version="v1",
+            prompts_dir=_PROMPTS_DIR,
             run_id="test_run_001",
         )
 
@@ -198,6 +210,7 @@ class TestPermutationRunnerRunOne:
             method_name="pride",
             split_name="robustness",
             prompt_version="v1",
+            prompts_dir=_PROMPTS_DIR,
             run_id="test_run_001",
         )
 
@@ -216,6 +229,7 @@ class TestPermutationRunnerRunOne:
             method_name="pride",
             split_name="robustness",
             prompt_version="v1",
+            prompts_dir=_PROMPTS_DIR,
             run_id="test_run_001",
         )
 
@@ -234,6 +248,7 @@ class TestPermutationRunnerRunOne:
             method_name="pride",
             split_name="robustness",
             prompt_version="v1",
+            prompts_dir=_PROMPTS_DIR,
             run_id="test_run_001",
         )
 
@@ -251,6 +266,7 @@ class TestPermutationRunnerRunOne:
             method_name="pride",
             split_name="robustness",
             prompt_version="v1",
+            prompts_dir=_PROMPTS_DIR,
             run_id="test_run_001",
         )
 

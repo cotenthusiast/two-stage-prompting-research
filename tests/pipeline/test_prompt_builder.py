@@ -1,10 +1,17 @@
 # tests/pipeline/test_prompt_builder.py
 
+from pathlib import Path
+
 from twoprompt.pipeline.prompt_builder import (
     build_direct_mcq_prompt,
     build_free_text_prompt,
     build_option_matching_prompt,
+    load_prompt_templates,
 )
+
+_REPO_ROOT = Path(__file__).resolve().parents[2]
+_PROMPTS_DIR = _REPO_ROOT / "prompts"
+_TEMPLATES = load_prompt_templates("v1", _PROMPTS_DIR)
 
 
 class TestBuildDirectMcqPrompt:
@@ -17,7 +24,9 @@ class TestBuildDirectMcqPrompt:
         option_c = "three"
         option_d = "four"
 
-        prompt = build_direct_mcq_prompt(question, option_a, option_b, option_c, option_d)
+        prompt = build_direct_mcq_prompt(
+            _TEMPLATES["direct_mcq"], question, option_a, option_b, option_c, option_d
+        )
 
         assert question in prompt
         assert "Respond with only the letter." in prompt
@@ -32,7 +41,7 @@ class TestBuildFreeTextPrompt:
     def test_includes_question_and_excludes_options(self):
         question = "Which number has one factor?"
 
-        actual = build_free_text_prompt(question)
+        actual = build_free_text_prompt(_TEMPLATES["free_text"], question)
 
         assert question in actual
         assert "Options:" not in actual
@@ -53,7 +62,15 @@ class TestBuildOptionMatchingPrompt:
         option_d = "four"
         free_response = "one"
 
-        prompt = build_option_matching_prompt(question, free_response, option_a, option_b, option_c, option_d)
+        prompt = build_option_matching_prompt(
+            _TEMPLATES["option_matching"],
+            question,
+            free_response,
+            option_a,
+            option_b,
+            option_c,
+            option_d,
+        )
 
         assert "Select the option that best matches the reference answer in the context of the question.".lower() in prompt.lower()
         assert question in prompt

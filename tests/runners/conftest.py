@@ -25,7 +25,7 @@ class MockClient(BaseClient):
             self,
             responses: list[ModelResponse] | None = None,
             provider: str = "openai",
-            model_name: str = "gpt-5-mini",
+            model_name: str = "gpt-4.1-mini",
     ) -> None:
         super().__init__(
             provider=provider,
@@ -51,7 +51,7 @@ def _make_success_response(
         raw_text: str,
         metadata: RequestMetadata,
         provider: str = "openai",
-        model_name: str = "gpt-5-mini",
+        model_name: str = "gpt-4.1-mini",
 ) -> ModelResponse:
     """Helper to build a successful ModelResponse."""
     return ModelResponse(
@@ -75,7 +75,7 @@ def _make_success_response(
 def _make_failure_response(
         metadata: RequestMetadata,
         provider: str = "openai",
-        model_name: str = "gpt-5-mini",
+        model_name: str = "gpt-4.1-mini",
 ) -> ModelResponse:
     """Helper to build a failed ModelResponse."""
     return ModelResponse(

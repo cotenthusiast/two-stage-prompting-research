@@ -5,6 +5,7 @@ from typing import Any
 
 from twoprompt.parsing.types import ParseResult, PARSE_OK, PARSE_MISSING
 from twoprompt.pipeline.prompt_builder import (
+    build_direct_mcq_prompt,
     build_free_text_prompt,
     build_option_matching_prompt,
 )
@@ -23,6 +24,10 @@ class TwoStagePermutationRunner(ExperimentRunner):
 
     Reuses permutation helpers from PermutationRunner.
     """
+
+    def __init__(self, *args, fallback_on_parse_failure: bool = False, **kwargs) -> None:
+        super().__init__(*args, **kwargs)
+        self._fallback_on_parse_failure = fallback_on_parse_failure
 
     async def run_one(self, question_row: Any, sample_index: int) -> dict:
         """Execute one question through two-stage + permutation.
@@ -119,6 +124,34 @@ class TwoStagePermutationRunner(ExperimentRunner):
         if voted_letter:
             score_result = self._score(voted_parse, question_row["correct_option"])
 
+        # Fallback: if majority vote produced no winner, re-issue the direct MCQ prompt.
+        # Goes through the normal client path — hits cache if baseline already ran,
+        # makes a live API call otherwise.
+        fallback_used = False
+        if self._fallback_on_parse_failure and voted_letter is None:
+            fallback_prompt = build_direct_mcq_prompt(
+                template=self._prompts["direct_mcq"],
+                question=question_row["question_text"],
+                option_a=question_row["choice_a"],
+                option_b=question_row["choice_b"],
+                option_c=question_row["choice_c"],
+                option_d=question_row["choice_d"],
+            )
+            fallback_request = self._build_model_request(
+                question_row, fallback_prompt, sample_index
+            )
+            fallback_response = await self.client.generate(fallback_request)
+            if fallback_response.is_success():
+                fallback_parse, fallback_score = self._parse_and_score(
+                    raw_text=fallback_response.raw_text,
+                    correct_option=question_row["correct_option"],
+                    options=canonical_options,
+                )
+                if fallback_parse.final_choice is not None:
+                    voted_parse = fallback_parse
+                    score_result = fallback_score
+                    fallback_used = True
+
         # Use the first permutation's trace for the result row
         result = self._build_result_row(
             question_row=question_row,
@@ -133,5 +166,6 @@ class TwoStagePermutationRunner(ExperimentRunner):
         result["free_text_prompt"] = free_text_prompt
         result["free_text_response"] = free_text_answer
         result["free_text_latency"] = free_text_response.latency_seconds
+        result["fallback_used"] = fallback_used
 
         return result

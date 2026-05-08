@@ -80,6 +80,7 @@ class ExperimentRunner(ABC):
             question_row: Any,
             prompt: str,
             sample_index: int,
+            request_logprobs: bool = False,
     ) -> ModelRequest:
         """Construct a standardized model request from a question and prompt.
 
@@ -87,6 +88,8 @@ class ExperimentRunner(ABC):
             question_row: Normalized question record.
             prompt: Fully formatted prompt string.
             sample_index: Repetition index for this question within the run.
+            request_logprobs: Whether to ask the provider for token log-probabilities
+                (Together only in this codebase).
 
         Returns:
             A validated ModelRequest ready for client execution.
@@ -110,6 +113,7 @@ class ExperimentRunner(ABC):
             temperature=self.temperature,
             max_tokens=self.max_tokens,
             seed=self.seed,
+            request_logprobs=request_logprobs,
         )
 
     @staticmethod

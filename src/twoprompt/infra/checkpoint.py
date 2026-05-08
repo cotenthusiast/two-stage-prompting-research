@@ -28,7 +28,8 @@ class CheckpointManager:
         model: str,
         benchmark: str,
     ) -> None:
-        self._path = checkpoint_dir / run_id / f"{condition}__{model}__{benchmark}.json"
+        safe_model = model.replace("/", "_")
+        self._path = checkpoint_dir / run_id / f"{condition}__{safe_model}__{benchmark}.json"
         self._path.parent.mkdir(parents=True, exist_ok=True)
 
     def load(self) -> dict | None:

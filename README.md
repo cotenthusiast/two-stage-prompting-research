@@ -1,4 +1,4 @@
-# Two-Stage Prompting Does Not Mitigate MCQ Positional Bias in LLMs
+# Thinking First, Failing Later: Two-Stage Prompting Does Not Mitigate MCQ Positional Bias
 
 This repository contains the full code and experiment pipeline for a benchmarking study on multiple-choice selection bias in large language models.
 

@@ -7,6 +7,7 @@ from pathlib import Path
 import numpy as np
 import pandas as pd
 import yaml
+from scipy.stats import beta as _beta_dist
 
 from twoprompt.config.experiment import (
     BASELINE_METHOD,
@@ -45,12 +46,13 @@ _CI_HI = 97.5
 _OPT_INDEX = {opt: i for i, opt in enumerate(OPTIONS)}
 
 
-def _bootstrap_ci_mean(values: np.ndarray, rng: np.random.Generator) -> tuple[float, float]:
-    """95% bootstrap CI for the mean, fully vectorised over all resamples."""
-    n = len(values)
-    idx = rng.integers(0, n, size=(N_BOOTSTRAP, n))
-    means = values[idx].mean(axis=1)
-    return float(np.percentile(means, _CI_LO)), float(np.percentile(means, _CI_HI))
+def _clopper_pearson_ci(k: int, n: int) -> tuple[float, float]:
+    """95% Clopper-Pearson exact binomial CI."""
+    if n == 0:
+        return float("nan"), float("nan")
+    lo = float(_beta_dist.ppf(0.025, k, n - k + 1)) if k > 0 else 0.0
+    hi = float(_beta_dist.ppf(0.975, k + 1, n - k)) if k < n else 1.0
+    return lo, hi
 
 
 def _bootstrap_ci_mean_abs_deviation(
@@ -316,7 +318,6 @@ def compute_accuracy(df: pd.DataFrame) -> pd.DataFrame:
     - final_unscorable = rows where is_correct is missing
     """
     rows = []
-    rng = np.random.default_rng(BOOTSTRAP_SEED)
 
     for method in METHOD_ORDER:
         for model in MODEL_ORDER:
@@ -340,18 +341,8 @@ def compute_accuracy(df: pd.DataFrame) -> pd.DataFrame:
             correct = int(group["is_correct"].eq(True).sum())
             final_unscorable = int(group["is_correct"].isna().sum())
 
-            is_correct_vals = group["is_correct"].eq(True).to_numpy(dtype=np.float64)
-            e2e_ci_lo, e2e_ci_hi = _bootstrap_ci_mean(is_correct_vals, rng)
-
-            scored_vals = (
-                group.loc[group["is_correct"].notna(), "is_correct"]
-                .eq(True)
-                .to_numpy(dtype=np.float64)
-            )
-            if len(scored_vals) > 0:
-                cond_ci_lo, cond_ci_hi = _bootstrap_ci_mean(scored_vals, rng)
-            else:
-                cond_ci_lo, cond_ci_hi = float("nan"), float("nan")
+            e2e_ci_lo, e2e_ci_hi = _clopper_pearson_ci(correct, total)
+            cond_ci_lo, cond_ci_hi = _clopper_pearson_ci(correct, scored)
 
             fallback_count = (
                 int(group["fallback_applied"].eq(True).sum())
